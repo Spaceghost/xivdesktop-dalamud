@@ -13,6 +13,12 @@ Statuses mean the same thing in every one of these mods:
 * **BETA** — merged, but not yet verified in game.
 * **SOON** — still being built.
 
+## [Unreleased] — In development
+
+Timeout handling is host-built; live question and timeout acceptance remains pending.
+
+* Ask an NPC now reports a timeout for the request that is still active. Cancellation tokens were compared by object identity, which always failed after boxing the value types and suppressed the error. Value equality preserves suppression for dismissed or replaced questions.
+
 ## [1.0.2] — Released 2026-09-23
 
 BETA entries are in this release but have not been verified in game yet; they become NEW or FIX once they have been seen working.
