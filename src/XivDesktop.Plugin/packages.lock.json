@@ -16,9 +16,9 @@
       },
       "KamiToolKit": {
         "type": "Direct",
-        "requested": "[2.2.54, )",
-        "resolved": "2.2.54",
-        "contentHash": "Ej2uWmmmJfX7486cvafNrZoLeKLMu1a6RDmtIf4PF5rt74IJEvUqUOWmsqFKy8hudX5dXVC4phZ3MdLGi+xIMg=="
+        "requested": "[2.2.64, )",
+        "resolved": "2.2.64",
+        "contentHash": "kblzefhH5ijiytCFZbdnooMJ7RkoAmayeAKdvRiKbmpftsoa8uwRg+VwaklZXJhPeK519FJTojpslf2OcFxkEQ=="
       },
       "xivdesktop.core": {
         "type": "Project"
