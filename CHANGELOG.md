@@ -19,6 +19,7 @@ Host-tested feature work; live game acceptance remains pending.
 
 ### Merged, not yet verified in game
 
+* Malformed Unicode escapes in Ghostty IPC replies are rejected before downstream readers inspect them. Invalid numeric request/revision fields and malformed Arcade strings also return an empty result instead of throwing. Includes deterministic regressions for the input found by CI fuzzing.
 * Experimental desktop feature build: app actions and macro copying, key-chord recording, workspace stowing and privacy masking, desk-plate and zone policies, notification handling, SVG icon requests and the optional controller ring. Offline logic tests and builds are available; compositor transport, clipboard integration and live game/controller acceptance retain the limits documented in accepted-votes.json. This build does not certify every planned feature.
 * Ask an NPC now reports a timeout for the request that is still active. Cancellation tokens were compared by object identity, which always failed after boxing the value types and suppressed the error. Value equality preserves suppression for dismissed or replaced questions.
 

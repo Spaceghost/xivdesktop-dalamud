@@ -288,6 +288,10 @@ public static class GhosttyWire
         {
             using var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
+            // JsonDocument defers decoding escaped Unicode until a key/value is read.
+            // Reject malformed surrogate escapes before returning a detached result.
+            if (json.Contains("\\u", StringComparison.Ordinal))
+                ValidateUnicode(root);
             if (root.ValueKind != JsonValueKind.Object)
                 return CallReply.Fail("reply is not an object");
             var ok = root.TryGetProperty("ok", out var okEl) && okEl.ValueKind == JsonValueKind.True;
@@ -300,10 +304,25 @@ public static class GhosttyWire
             var result = root.TryGetProperty("result", out var r) ? r.Clone() : default;
             return new CallReply(true, null, result);
         }
-        catch (JsonException ex)
+        catch (Exception ex) when (ex is JsonException or InvalidOperationException)
         {
             return CallReply.Fail("malformed reply: " + ex.Message);
         }
+    }
+
+    private static void ValidateUnicode(JsonElement value)
+    {
+        if (value.ValueKind == JsonValueKind.String)
+            _ = value.GetString();
+        else if (value.ValueKind == JsonValueKind.Object)
+            foreach (var property in value.EnumerateObject())
+            {
+                _ = property.Name;
+                ValidateUnicode(property.Value);
+            }
+        else if (value.ValueKind == JsonValueKind.Array)
+            foreach (var item in value.EnumerateArray())
+                ValidateUnicode(item);
     }
 
     /// <summary>The request id of a queued change (<c>{"queued": true, "request": N}</c>), or null.</summary>
@@ -311,7 +330,7 @@ public static class GhosttyWire
     {
         if (!reply.Ok || reply.Result.ValueKind != JsonValueKind.Object)
             return null;
-        return reply.Result.TryGetProperty("request", out var r) && r.TryGetInt64(out var id) ? id : null;
+        return reply.Result.TryGetProperty("request", out var r) && r.ValueKind == JsonValueKind.Number && r.TryGetInt64(out var id) ? id : null;
     }
 
     /// <summary>Only the <c>rev</c> of a window.list reply, for the cheap poll; null when the reply failed.</summary>
@@ -319,7 +338,7 @@ public static class GhosttyWire
     {
         if (!reply.Ok || reply.Result.ValueKind != JsonValueKind.Object)
             return null;
-        return reply.Result.TryGetProperty("rev", out var r) && r.TryGetInt64(out var rev) ? rev : null;
+        return reply.Result.TryGetProperty("rev", out var r) && r.ValueKind == JsonValueKind.Number && r.TryGetInt64(out var rev) ? rev : null;
     }
 
     public static WindowListSnapshot? ParseWindowList(string? json) => ParseWindowList(ParseReply(json));

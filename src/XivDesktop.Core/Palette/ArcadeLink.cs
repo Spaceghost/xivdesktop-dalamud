@@ -31,7 +31,7 @@ public static class ArcadeLink
 
             return hits;
         }
-        catch (JsonException)
+        catch (Exception ex) when (ex is JsonException or InvalidOperationException)
         {
             return [];
         }

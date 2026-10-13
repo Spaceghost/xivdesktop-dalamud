@@ -5,6 +5,29 @@ namespace XivDesktop.Core.Tests;
 
 public class GhosttyWireTests
 {
+    [Theory]
+    [InlineData("""{"\ud800":true,"version":"3","windows":"wayland"}""")]
+    [InlineData("""{"ok":true,"result":{"\ud800":1}}""")]
+    [InlineData("""{"ok":true,"result":[{"id":"\ud800"}]}""")]
+    public void MalformedUnicodeIsRejectedAtTheReplyBoundary(string json)
+    {
+        Assert.False(GhosttyWire.ParseReply(json).Ok);
+        Assert.Empty(GhosttyWire.ParseAgentApps(json));
+        Assert.Null(GhosttyWire.ParseWindowList(json));
+        Assert.Null(Panels.ParseList(json));
+    }
+
+    [Fact]
+    public void ValidUnicodePairsAndMalformedNumericFieldsRemainSafe()
+    {
+        var reply = GhosttyWire.ParseReply("""{"ok":true,"result":{"title":"\ud83d\ude00","request":"1","rev":null}}""");
+        Assert.True(reply.Ok);
+        Assert.Equal("😀", reply.Result.GetProperty("title").GetString());
+        Assert.Null(GhosttyWire.ParseQueued(reply));
+        Assert.Null(GhosttyWire.PeekRev(reply));
+        Assert.Empty(Palette.ArcadeLink.Parse("""[{"id":"\ud800","title":"bad"}]"""));
+    }
+
     // The documented window.list reply (ghostty-dalamud docs/IPC.md).
     private const string ListReply = """
         {"ok": true, "result": {
