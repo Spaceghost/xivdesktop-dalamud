@@ -76,7 +76,9 @@ public class DesktopContextTests
     [Fact]
     public void StowIncludesWorldTerminalsAdoptedHudAndFullscreenPanelsOnce()
     {
-        var full = new PanelListSnapshot { Panels =
+        var full = new PanelListSnapshot
+        {
+            Panels =
         [
             new PanelInfo { Id = 1, Kind = "window", View = "pet", Title = "Window" },
             new PanelInfo { Id = 2, Kind = "terminal", View = "pin" },
@@ -84,7 +86,8 @@ public class DesktopContextTests
             new PanelInfo { Id = 4, Kind = "terminal", View = "hidden" },
             new PanelInfo { Id = 5, Kind = "window", View = "full" },
             new PanelInfo { Id = 6, Kind = "terminal", View = "tab" },
-        ] };
+        ]
+        };
         var world = PanelStow.WorldPanels([W(1), W(5, kind: "full")], full);
         Assert.Equal(5, world.Count);
         var stow = new PanelStow();

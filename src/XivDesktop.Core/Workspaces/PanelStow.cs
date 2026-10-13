@@ -23,7 +23,11 @@ public sealed class PanelStow
             if (p.View is not ("pet" or "pin" or "hud" or "full" or "hidden")) continue;
             all[p.Id] = new WindowPanel
             {
-                Id = p.Id, Title = p.Title, App = p.App, State = "live", Focused = p.Focused,
+                Id = p.Id,
+                Title = p.Title,
+                App = p.App,
+                State = "live",
+                Focused = p.Focused,
                 Kind = p.View is "hidden" or "full" ? "pin" : p.View,
                 Hidden = p.IsHidden,
             };

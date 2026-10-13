@@ -39,7 +39,7 @@ public class SvgIconRequestTests
     public void AgentIconMetadataRepliesParseWithoutBecomingAppRows()
     {
         var reply = XivDesktop.Core.Windows.GhosttyWire.ParseAgentIcons("""{"ok":true,"result":[{"icon":"custom.svg","size":48,"png":"/cache/custom.png"},{"icon":"bad","size":999,"png":"/cache/bad.png"}]}""");
-        Assert.Equal(new SvgIconReply("custom.svg",48,"/cache/custom.png"), Assert.Single(reply));
+        Assert.Equal(new SvgIconReply("custom.svg", 48, "/cache/custom.png"), Assert.Single(reply));
         Assert.Empty(XivDesktop.Core.Windows.GhosttyWire.ParseAgentIcons("invalid"));
         Assert.Empty(XivDesktop.Core.Windows.GhosttyWire.ParseAgentIcons("""{"ok":false,"error":"unknown method"}"""));
     }
@@ -67,24 +67,24 @@ public class SvgIconRequestTests
     {
         var a = App("editor", "shared");
         var b = App("terminal", "shared") with { Terminal = true, AgentId = "host-terminal" };
-        var request = Assert.Single(SvgIconRequests.Build([a,b],48));
-        var result = SvgIconRequests.Apply([a,b],request,[new("shared",48,"/cache/icon.png")],p => "Z:" + p);
-        Assert.All(result, app => Assert.Equal("Z:/cache/icon.png",app.IconPath));
-        Assert.Equal(a.Command,result[0].Command);
-        Assert.Equal(a.Exec,result[0].Exec);
+        var request = Assert.Single(SvgIconRequests.Build([a, b], 48));
+        var result = SvgIconRequests.Apply([a, b], request, [new("shared", 48, "/cache/icon.png")], p => "Z:" + p);
+        Assert.All(result, app => Assert.Equal("Z:/cache/icon.png", app.IconPath));
+        Assert.Equal(a.Command, result[0].Command);
+        Assert.Equal(a.Exec, result[0].Exec);
         Assert.Null(result[0].AgentId);
         Assert.True(result[1].Terminal);
-        Assert.Equal(b.AgentId,result[1].AgentId);
-        Assert.Equal(IconKind.SvgOnly,a.IconKind);
+        Assert.Equal(b.AgentId, result[1].AgentId);
+        Assert.Equal(IconKind.SvgOnly, a.IconKind);
     }
 
     [Fact]
     public void StaleSizeUnsolicitedIconsAndUnusablePathsDoNotReplaceFallbacks()
     {
-        var app = App("a","wanted");
-        var request = Assert.Single(SvgIconRequests.Build([app],48));
-        var replies = new SvgIconReply[] { new("wanted",64,"/cache/old.png"), new("other",48,"/cache/other.png"), new("wanted",48,"icon.png"), new("wanted",48,"/cache/icon.svg") };
-        Assert.Same(app, Assert.Single(SvgIconRequests.Apply([app],request,replies,p => p)));
-        Assert.Same(app, Assert.Single(SvgIconRequests.Apply([app],request,[new("wanted",48,"/cache/icon.png")],_ => null)));
+        var app = App("a", "wanted");
+        var request = Assert.Single(SvgIconRequests.Build([app], 48));
+        var replies = new SvgIconReply[] { new("wanted", 64, "/cache/old.png"), new("other", 48, "/cache/other.png"), new("wanted", 48, "icon.png"), new("wanted", 48, "/cache/icon.svg") };
+        Assert.Same(app, Assert.Single(SvgIconRequests.Apply([app], request, replies, p => p)));
+        Assert.Same(app, Assert.Single(SvgIconRequests.Apply([app], request, [new("wanted", 48, "/cache/icon.png")], _ => null)));
     }
 }

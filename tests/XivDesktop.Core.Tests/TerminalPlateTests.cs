@@ -10,13 +10,16 @@ public class TerminalPlateTests
     public void MergeKeepsRichWindowDataAndAddsOnlyNativeWorldPanels()
     {
         var browser = new WindowPanel { Id = 1, App = "browser", State = "live", Agent = "host", Pin = "pet", Kind = "pet" };
-        var merged = Panels.WorkspaceWindows(new() { Windows = [browser] }, new() { Panels = [
+        var merged = Panels.WorkspaceWindows(new() { Windows = [browser] }, new()
+        {
+            Panels = [
             new() { Id = 1, Kind = "window", Title = "browser" },
             new() { Id = 2, Kind = "terminal", Profile = "shell", Title = "htop", View = "hud", Pin = "hud 0.2 0.7 2.4 0.9", SupportsPlacementCapture = true, Running = true },
             new() { Id = 3, Kind = "terminal", View = "tab", Running = true },
             new() { Id = 4, Kind = "terminal", View = "hidden", Running = true },
             new() { Id = 5, Kind = "terminal", View = "pet", Running = false },
-        ] });
+        ]
+        });
         Assert.Equal(new long[] { 1, 2, 4, 5 }, merged.Select(p => p.Id));
         Assert.Same(browser, merged[0]);
         Assert.Equal("profile:shell", merged[1].App);
@@ -47,10 +50,13 @@ public class TerminalPlateTests
     [Fact]
     public void NativeHudAndHiddenTerminalsFollowWorkspaceVisibility()
     {
-        var panels = Panels.WorkspaceWindows(WindowListSnapshot.Empty, new() { Panels = [
+        var panels = Panels.WorkspaceWindows(WindowListSnapshot.Empty, new()
+        {
+            Panels = [
             new() { Id = 2, Kind = "terminal", View = "hud", Running = true },
             new() { Id = 3, Kind = "terminal", View = "hidden", Running = true },
-        ] });
+        ]
+        });
         var model = new WorkspaceModel();
         model.Reconcile(panels);
         model.Move(2, 2);
