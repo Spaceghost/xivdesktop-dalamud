@@ -35,8 +35,12 @@ public sealed record DesktopEntry
 
     public IReadOnlyList<string> Categories { get; init; } = [];
 
+    public IReadOnlyList<string> MimeTypes { get; init; } = [];
+
     /// <summary>Exec= after string unescaping (quoting and field codes still in place).</summary>
     public string Exec { get; init; } = "";
+
+    public IReadOnlyList<DesktopAction> Actions { get; init; } = [];
 
     public string TryExec { get; init; } = "";
 
@@ -56,6 +60,9 @@ public sealed record DesktopEntry
     public string SourcePath { get; init; } = "";
 }
 
+/// <summary>A listed .desktop action with its independently quoted launch command.</summary>
+public sealed record DesktopAction(string Id, string Name, string Exec, string Command, string Icon = "");
+
 /// <summary>A launchable, visible application in the catalog.</summary>
 public sealed record AppInfo
 {
@@ -71,11 +78,15 @@ public sealed record AppInfo
 
     public IReadOnlyList<string> Categories { get; init; } = [];
 
+    public IReadOnlyList<string> MimeTypes { get; init; } = [];
+
     /// <summary>Exec= as written (unescaped string, before field-code removal).</summary>
     public string Exec { get; init; } = "";
 
     /// <summary>Shell command line for "window pull run ..." (sh -c on the host): field codes removed, arguments re-quoted.</summary>
     public string Command { get; init; } = "";
+
+    public IReadOnlyList<DesktopAction> Actions { get; init; } = [];
 
     public bool Terminal { get; init; }
 

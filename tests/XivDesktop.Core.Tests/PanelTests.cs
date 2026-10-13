@@ -131,7 +131,7 @@ public class PanelTests
         Assert.Null(PaletteEngine.ActionFor(mappy, KeyChord.Parse("Ctrl+Q")));
 
         var app = PaletteEngine.Build(Ctx, "a:firefox")[0];
-        Assert.Equal("Launch", Assert.Single(PaletteEngine.RowActions(app)).Label);
+        Assert.Equal("Launch", PaletteEngine.RowActions(app)[0].Label);
         Assert.Null(PaletteEngine.ActionFor(app, KeyChord.Parse("Ctrl+W")));
     }
 

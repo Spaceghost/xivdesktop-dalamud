@@ -9,6 +9,27 @@ public static class LaunchPlan
 {
     public const string RunPrefix = "window pull run ";
 
+    /// <summary>A stable game macro line, independent of translated names and catalog order.</summary>
+    public static string MacroLine(string desktopId)
+    {
+        if (string.IsNullOrWhiteSpace(desktopId) || desktopId.Any(char.IsControl))
+            throw new ArgumentException("A desktop id must be nonempty and contain no control characters.", nameof(desktopId));
+        return "/desktop launch " + desktopId;
+    }
+
+    /// <summary>Use an action's Exec instead of the agent's default app launch, retaining Terminal=true.</summary>
+    public static AppInfo? ActionApp(AppInfo app, string actionId)
+    {
+        var action = app.Actions.FirstOrDefault(a => a.Id == actionId);
+        return action == null ? null : app with
+        {
+            Name = app.Name + " — " + action.Name,
+            Exec = action.Exec,
+            Command = action.Command,
+            AgentId = null,
+        };
+    }
+
     /// <summary>"window pull run CMD": ghostty-agent starts CMD with sh -c and shows its window as a pet.</summary>
     public static string PostLine(string command) => RunPrefix + command;
 

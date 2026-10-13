@@ -12,7 +12,7 @@ public static class IpcContract
     /// <summary>
     /// Func&lt;string&gt;: JSON array of visible apps, catalog order:
     /// [{ id, name, generic, categories: string[], favourite, keywords: string[], recent: int|null (0 = most recent),
-    ///    terminal, launchable }].
+    ///    terminal, launchable, actions: [{id, name, icon}] }].
     /// The first five fields are the documented v1 surface; the rest are additive.
     /// </summary>
     public const string ListApps = "XivDesktop.v1.ListApps";
@@ -40,6 +40,12 @@ public static class IpcContract
     public const string ToggleFavourite = "XivDesktop.v1.ToggleFavourite";
 
     /// <summary>Func&lt;string&gt;: JSON object, see <see cref="WindowsPayload"/>: window panels with their workspaces.</summary>
+    /// <summary>Func&lt;string&gt;: saved plates and the last application status as JSON.</summary>
+    public const string Plates = "XivDesktop.v1.Plates";
+
+    /// <summary>Func&lt;string,string&gt;: plate name; queues application, inspect Plates for completion.</summary>
+    public const string ApplyPlate = "XivDesktop.v1.ApplyPlate";
+
     public const string Windows = "XivDesktop.v1.Windows";
 
     /// <summary>
@@ -153,7 +159,14 @@ public sealed record AppSummary
     public bool Terminal { get; init; }
 
     public bool Launchable { get; init; }
+
+    /// <summary>Resolved local PNG path, optional for older providers.</summary>
+    public string? IconPath { get; init; }
+
+    public List<AppActionSummary> Actions { get; init; } = [];
 }
+
+public sealed record AppActionSummary(string Id, string Name, string Icon);
 
 public sealed record StatusPayload
 {
@@ -179,6 +192,8 @@ public sealed record StatusPayload
 
 public sealed record WindowsPayload
 {
+    public bool Veiled { get; init; }
+
     /// <summary>ghostty-dalamud's Call gate is registered (window list and actions work).</summary>
     public bool Available { get; init; }
 
@@ -211,14 +226,19 @@ public sealed record WindowPayload
 
     public bool Focused { get; init; }
 
-    /// <summary>1..9, or 0 while not assigned yet.</summary>
+    /// <summary>1..9, or 0 for unassigned panels and scratchpad panels (see Scratchpad).</summary>
     public int Workspace { get; init; }
 
-    /// <summary>XivDesktop hid it (another workspace is current).</summary>
+    public bool Scratchpad { get; init; }
+
+    /// <summary>Hidden by workspaces, scratchpad, or temporary stowing.</summary>
     public bool Hidden { get; init; }
 
     /// <summary>Best-guess desktop-file id from the catalog, for an icon; null when unknown.</summary>
     public string? AppId { get; init; }
+
+    /// <summary>Resolved local app PNG path; omitted while veiled.</summary>
+    public string? IconPath { get; init; }
 }
 
 public sealed record PaletteResultPayload

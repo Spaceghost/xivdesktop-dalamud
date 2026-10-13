@@ -31,6 +31,11 @@ public sealed class KeybindService : IDisposable
     private readonly Configuration config;
     private readonly Action<string> run;
     private readonly ChordTracker tracker = new();
+    private readonly ChordCapture capture = new();
+    private readonly Action save;
+    public string? CaptureAction { get; private set; }
+    public string CaptureMessage => capture.Message;
+    public bool Capturing => capture.Active;
     private readonly ModifierGate modifiers = new();
     private readonly Func<int, bool> isDown;
     private readonly Func<int, bool> rawDown;
@@ -39,7 +44,7 @@ public sealed class KeybindService : IDisposable
 
     private readonly Func<bool> panelHasKeyboard;
 
-    public KeybindService(IFramework framework, IKeyState keys, IPluginLog log, Configuration config, Action<string> run, Func<bool> panelHasKeyboard)
+    public KeybindService(IFramework framework, IKeyState keys, IPluginLog log, Configuration config, Action<string> run, Func<bool> panelHasKeyboard, Action save)
     {
         this.panelHasKeyboard = panelHasKeyboard;
         this.framework = framework;
@@ -47,6 +52,7 @@ public sealed class KeybindService : IDisposable
         this.log = log;
         this.config = config;
         this.run = run;
+        this.save = save;
         isDown = IsDown;
         rawDown = RawDown;
         Recompile();
@@ -71,9 +77,19 @@ public sealed class KeybindService : IDisposable
         compiledFrom = config.Keybinds;
     }
 
+    public void BeginCapture(string action)
+    {
+        if (!KeyAction.All.Contains(action)) return;
+        CaptureAction = action;
+        capture.Begin(rawDown, Environment.TickCount64);
+        tracker.Reset();
+    }
+
+    public void CancelCapture() => capture.Cancel();
+
     private void OnUpdate(IFramework fw)
     {
-        if (!config.KeybindsEnabled)
+        if (!config.KeybindsEnabled && !capture.Active)
         {
             modifiers.Reset();
             return;
@@ -87,10 +103,26 @@ public sealed class KeybindService : IDisposable
             {
                 tracker.Reset();
                 modifiers.Reset();
+                if (capture.Active) capture.Cancel("Recording cancelled because the game lost focus.");
                 return;
             }
 
             modifiers.Update(rawDown, foreground: true, Environment.TickCount64);
+            if (capture.Active)
+            {
+                // Mark currently held bindings blocked so the recorded chord cannot immediately launch an app.
+                tracker.Update(isDown, blocked: true);
+                if (capture.Update(isDown, Environment.TickCount64) is { } chord && CaptureAction is { } action)
+                {
+                    var next = new Dictionary<string, string>(config.Keybinds) { [action] = chord.ToString() };
+                    config.Keybinds = next;
+                    Recompile();
+                    tracker.Update(isDown, blocked: true);
+                    if (IsValid(chord.Key)) keys[(VirtualKey)chord.Key] = false;
+                    save();
+                }
+                return;
+            }
 
             // While a ghostty panel has the keyboard, ghostty sets WantTextInput every frame, and Dalamud then
             // withholds key messages from the game, so IKeyState sees nothing. With global reading the chords
@@ -155,7 +187,7 @@ public sealed class KeybindService : IDisposable
         }
     }
 
-    private static bool GameInForeground()
+    internal static bool GameInForeground()
     {
         if (!OperatingSystem.IsWindows())
             return true;

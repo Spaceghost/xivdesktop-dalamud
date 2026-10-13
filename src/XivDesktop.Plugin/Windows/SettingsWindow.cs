@@ -2,6 +2,9 @@ using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Windowing;
+using Dalamud.Plugin.Services;
+using ClassJob = Lumina.Excel.Sheets.ClassJob;
+using XivDesktop.Core;
 using XivDesktop.Core.Input;
 using XivDesktop.Core.Workspaces;
 using XivDesktop.Plugin.Services;
@@ -16,14 +19,17 @@ public sealed class SettingsWindow : Window
     private readonly SessionService session;
     private readonly KeybindService keybinds;
     private readonly Dictionary<string, string> editing = [];
+    private readonly List<(uint Id, string Name)> jobs;
 
-    public SettingsWindow(Configuration config, DesktopService desktop, SessionService session, KeybindService keybinds)
+    public SettingsWindow(Configuration config, DesktopService desktop, SessionService session, KeybindService keybinds, IDataManager data)
         : base("XivDesktop settings###XivDesktopSettings")
     {
         this.config = config;
         this.desktop = desktop;
         this.session = session;
         this.keybinds = keybinds;
+        jobs = data.GetExcelSheet<ClassJob>().Where(j => j.RowId > 0 && j.Name.ExtractText().Length > 0)
+            .Select(j => (j.RowId, j.Name.ExtractText())).ToList();
         Size = new Vector2(560, 620);
         SizeCondition = ImGuiCond.FirstUseEver;
     }
@@ -32,6 +38,8 @@ public sealed class SettingsWindow : Window
     public Action? AskTab { get; set; }
 
     public override void OnOpen() => editing.Clear();
+
+    public override void OnClose() => keybinds.CancelCapture();
 
     public override void Draw()
     {
@@ -219,6 +227,32 @@ public sealed class SettingsWindow : Window
 
     private void General()
     {
+        var appNotifications = config.AppNotificationsEnabled;
+        if (ImGui.Checkbox("App notification toasts (opt in)", ref appNotifications)) { config.AppNotificationsEnabled = appNotifications; desktop.Save(); }
+        var titleOnly = config.AppNotificationsTitleOnly;
+        if (ImGui.Checkbox("App notifications: title only", ref titleOnly)) { config.AppNotificationsTitleOnly = titleOnly; desktop.Save(); }
+        ImGui.TextWrapped("Compositor apps only. Click to focus the app panel. Private apps, privacy veil and duty stow suppress toasts; bursts are limited.");
+        var clipboardEnabled = config.ClipboardBridgeEnabled;
+        if (ImGui.Checkbox("Sync text clipboard with host (opt in)", ref clipboardEnabled)) { config.ClipboardBridgeEnabled = clipboardEnabled; desktop.Save(); }
+        ImGui.TextWrapped("Pauses during privacy veil or duty stow. Requires clipboard sensitivity metadata from the agent; older replies are skipped.");
+        var ringEnabled = config.ControllerRingEnabled;
+        if (ImGui.Checkbox("Controller ring launcher", ref ringEnabled)) { config.ControllerRingEnabled = ringEnabled; desktop.Save(); }
+        var ringChord = config.ControllerRingChord;
+        if (ImGui.InputText("Ring hold chord", ref ringChord, 100)) { config.ControllerRingChord = ringChord; desktop.Save(); }
+        if (ControllerRingWindow.ParseChord(ringChord).Length == 0) ImGui.TextUnformatted("Invalid chord: use named buttons; L1, R1 and East are reserved.");
+        ImGui.TextDisabled("Use button names joined by +, e.g. L3+R3. L1/R1 change workspace; East cancels.");
+        ImGui.TextDisabled("The game also receives these buttons; choose a chord you leave unbound.");
+        var ringDeadzone = config.ControllerRingDeadzone;
+        if (ImGui.InputInt("Ring stick deadzone (raw units)", ref ringDeadzone)) { config.ControllerRingDeadzone = Math.Clamp(ringDeadzone, 1, 32767); desktop.Save(); }
+
+        var iconPixels = config.IconSize;
+        if (ImGui.SliderInt("App icon size", ref iconPixels, 24, 128))
+        {
+            config.IconSize = iconPixels;
+            desktop.Save();
+        }
+        ImGui.TextDisabled("Matching host agents rasterize SVG app icons at this size.");
+
         var changed = false;
         var b = config.PaletteCloseOnFocusLoss;
         if (ImGui.Checkbox("Close the launcher when it loses focus", ref b))
@@ -317,6 +351,12 @@ public sealed class SettingsWindow : Window
 
     private void Keys()
     {
+        if (keybinds.CaptureMessage.Length > 0)
+            ImGui.TextWrapped(keybinds.CaptureMessage);
+        if (keybinds.Capturing && ImGui.Button("Cancel recording")) keybinds.CancelCapture();
+        if (keybinds.Capturing && keybinds.CaptureAction is { } recording)
+            ImGui.TextDisabled("Recording: " + KeyAction.Describe(recording));
+
         var enabled = config.KeybindsEnabled;
         if (ImGui.Checkbox("Key chords on", ref enabled))
         {
@@ -371,7 +411,7 @@ public sealed class SettingsWindow : Window
             ImGui.TableNextColumn();
             if (!editing.TryGetValue(action, out var text))
                 text = config.Keybinds.GetValueOrDefault(action, "");
-            ImGui.SetNextItemWidth(-1);
+            ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X - 70);
             var valid = text.Trim().Length == 0 || KeyChord.TryParse(text, out _);
             if (!valid)
                 ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.DalamudOrange);
@@ -379,7 +419,14 @@ public sealed class SettingsWindow : Window
                 editing[action] = text;
             if (!valid)
                 ImGui.PopStyleColor();
-            if (ImGui.IsItemDeactivatedAfterEdit() && editing.Remove(action, out var edited))
+            var finishedEditing = ImGui.IsItemDeactivatedAfterEdit();
+            ImGui.SameLine();
+            if (ImGui.SmallButton("Record##" + action))
+            {
+                editing.Remove(action);
+                keybinds.BeginCapture(action);
+            }
+            if (finishedEditing && editing.Remove(action, out var edited))
             {
                 var next = new Dictionary<string, string>(config.Keybinds);
                 if (edited.Trim().Length == 0)
@@ -407,7 +454,7 @@ public sealed class SettingsWindow : Window
         ImGui.TextUnformatted(w.WindowsAvailable ? "Window IPC: GhosttyDalamud.v1.Call registered" : "Window IPC: not registered (window list, workspaces and window actions are off)");
         if (w.Agent is { } a)
             ImGui.TextUnformatted($"Agent: {(a.Connected ? "connected" : "not connected")}, protocol {a.Version}, windows {(a.WindowsOk ? "yes" : "no")}{(a.Agent.Length > 0 ? " · " + a.Agent : "")}");
-        if (session.LastMessage is { } m)
+        if (session.VisibleMessage is { } m)
             ImGui.TextDisabled("Last: " + m);
 
         ImGui.Separator();
@@ -420,6 +467,123 @@ public sealed class SettingsWindow : Window
         }
 
         ImGui.TextWrapped("Hiding uses window.place with \"hide\" (/term pin hide). Off: workspaces only group panels in the palette and the taskbar.");
+
+        ImGui.Separator();
+        var veil = session.Veiled;
+        if (ImGui.Checkbox("Privacy veil", ref veil)) session.SetVeil(veil);
+        var gposeVeil = config.VeilInGpose;
+        if (ImGui.Checkbox("Enable the veil in group pose", ref gposeVeil))
+        { config.VeilInGpose = gposeVeil; desktop.Save(); }
+        ImGui.TextWrapped("The veil masks panel titles and notifications. Private panels are hidden too; app exceptions for duty stowing do not override privacy.");
+        if (ImGui.CollapsingHeader("Private apps and panels"))
+        {
+            foreach (var app in desktop.Catalog.Catalog.Apps)
+            {
+                var selected = UserLists.Contains(config.PrivateApps, app.Id);
+                if (ImGui.Checkbox(app.Name + "##private-app:" + app.Id, ref selected))
+                {
+                    config.PrivateApps = UserLists.ToggleFavourite(config.PrivateApps, app.Id);
+                    desktop.Save(); session.ResetVisibility();
+                }
+            }
+            foreach (var panel in session.OpenPanels())
+            {
+                var selected = session.IsTaggedPrivate(panel);
+                var title = session.Veiled ? "Window " + panel.Id : panel.DisplayName;
+                if (ImGui.Checkbox(title + "##private-panel:" + panel.Id, ref selected)) session.TogglePrivate(panel);
+            }
+        }
+        var combat = config.StowInCombat;
+        var duty = config.StowInDuty;
+        var pop = config.StowOnDutyPop;
+        if (ImGui.Checkbox("Stow panels during combat", ref combat)) { config.StowInCombat = combat; desktop.Save(); }
+        if (ImGui.Checkbox("Stow panels inside duties", ref duty)) { config.StowInDuty = duty; desktop.Save(); }
+        if (ImGui.Checkbox("Stow when the duty confirmation appears", ref pop)) { config.StowOnDutyPop = pop; desktop.Save(); }
+        ImGui.TextDisabled(session.Stowed ? "The desk is temporarily stowed." : "Stowing restores visible panels when the condition ends.");
+        if (ImGui.CollapsingHeader("Apps to keep visible while stowed"))
+        {
+            foreach (var app in desktop.Catalog.Catalog.Apps)
+            {
+                var keep = UserLists.Contains(config.StowExceptions, app.Id);
+                if (ImGui.Checkbox(app.Name + "##stow:" + app.Id, ref keep))
+                {
+                    config.StowExceptions = UserLists.ToggleFavourite(config.StowExceptions, app.Id);
+                    desktop.Save();
+                    session.ResetVisibility();
+                }
+            }
+        }
+        if (ImGui.CollapsingHeader("Change job, change workspace"))
+        {
+            ImGui.TextWrapped("Choose a workspace for each job. None keeps the workspace you selected; manual switches remain until the next job change.");
+            foreach (var job in jobs)
+            {
+                var selected = Math.Clamp(config.JobWorkspaces.GetValueOrDefault(job.Id), 0, WorkspaceModel.Count);
+                ImGui.SetNextItemWidth(120);
+                if (ImGui.Combo(job.Name + "##job:" + job.Id, ref selected,
+                    ["None", "1", "2", "3", "4", "5", "6", "7", "8", "9"], 10))
+                {
+                    var next = new Dictionary<uint, int>(config.JobWorkspaces);
+                    if (selected == 0) next.Remove(job.Id); else next[job.Id] = selected;
+                    config.JobWorkspaces = next;
+                    desktop.Save();
+                }
+            }
+        }
+        if (ImGui.CollapsingHeader("Layouts by territory"))
+        {
+            ImGui.TextWrapped("Bind the current territory to a workspace or saved plate. Applies once after loading settles. Duties are excluded unless enabled on that rule. Shared territory IDs also share a rule.");
+            if (session.Veiled) ImGui.TextDisabled("Lift the privacy veil to manage layouts.");
+            else
+            {
+                ImGui.TextUnformatted($"Current territory: {session.CurrentTerritory}");
+                if (session.CurrentTerritory > 0)
+                {
+                    var names = new[] { "None" }.Concat(Enumerable.Range(1, 9).Select(n => "Workspace " + n))
+                        .Concat(session.Plates.Select(p => "Plate " + p.Name)).ToArray();
+                    var rule = config.ZoneLayouts.GetValueOrDefault(session.CurrentTerritory);
+                    var selected = rule?.Workspace ?? 0;
+                    if (rule is { Workspace: 0 })
+                    {
+                        var index = session.Plates.ToList().FindIndex(p => p.Name.Equals(rule.Plate, StringComparison.OrdinalIgnoreCase));
+                        selected = index >= 0 ? 10 + index : 0;
+                    }
+                    if (ImGui.Combo("This territory", ref selected, names, names.Length))
+                    {
+                        if (selected == 0) session.ZoneCommand("clear");
+                        else if (selected <= 9) session.ZoneCommand("ws " + selected);
+                        else session.ZoneCommand("plate " + session.Plates[selected - 10].Name);
+                    }
+                }
+                foreach (var pair in config.ZoneLayouts.OrderBy(p => p.Key).ToArray())
+                {
+                    ImGui.PushID((int)pair.Key);
+                    ImGui.TextUnformatted($"{pair.Key}: {(pair.Value.Workspace > 0 ? "workspace " + pair.Value.Workspace : "plate " + pair.Value.Plate)}");
+                    var allowZoneDuty = pair.Value.AllowInDuty;
+                    if (ImGui.Checkbox("Allow in duties", ref allowZoneDuty))
+                    {
+                        config.ZoneLayouts[pair.Key] = pair.Value with { AllowInDuty = allowZoneDuty };
+                        desktop.Save();
+                    }
+                    ImGui.SameLine();
+                    if (ImGui.SmallButton("Remove")) { config.ZoneLayouts.Remove(pair.Key); desktop.Save(); }
+                    ImGui.PopID();
+                }
+            }
+        }
+        if (ImGui.CollapsingHeader("Scratchpad"))
+        {
+            ImGui.TextWrapped("Stash the focused panel, then summon it on any workspace. One panel toggles; several cycle in order. Super+Shift+Minus stashes and Super+Minus summons by default.");
+            if (ImGui.Button("Stash focused panel")) session.StashTarget();
+            ImGui.SameLine();
+            if (ImGui.Button("Summon scratchpad")) session.SummonScratchpad();
+            var pin = config.ScratchpadPin;
+            if (ImGui.InputText("Placement for tabs or full-screen panels", ref pin, 64) && !string.IsNullOrWhiteSpace(pin))
+            {
+                config.ScratchpadPin = pin.Trim();
+                desktop.Save();
+            }
+        }
 
         ImGui.TextUnformatted("Workspace:");
         for (var n = 1; n <= WorkspaceModel.Count; n++)
@@ -443,7 +607,7 @@ public sealed class SettingsWindow : Window
         ImGui.TableSetupColumn("WS", ImGuiTableColumnFlags.WidthFixed, 30);
         ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed, 150);
         ImGui.TableHeadersRow();
-        foreach (var p in w.Snapshot.Windows)
+        foreach (var p in session.VisibleWindows)
         {
             ImGui.TableNextRow();
             ImGui.PushID((int)p.Id);
@@ -454,7 +618,7 @@ public sealed class SettingsWindow : Window
             ImGui.TableNextColumn();
             ImGui.TextDisabled($"{p.State} {p.Kind}{(session.IsHiddenNow(p) ? " hidden" : "")}");
             ImGui.TableNextColumn();
-            ImGui.TextUnformatted(session.WorkspaceOf(p.Id) is var ws and > 0 ? ws.ToString() : "-");
+            ImGui.TextUnformatted(session.IsScratchpad(p.Id) ? "Bag" : session.WorkspaceOf(p.Id) is var ws and > 0 ? ws.ToString() : "-");
             ImGui.TableNextColumn();
             if (!p.IsEnded)
             {

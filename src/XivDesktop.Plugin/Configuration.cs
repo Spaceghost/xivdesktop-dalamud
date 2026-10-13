@@ -2,6 +2,7 @@ using Dalamud.Configuration;
 using Dalamud.Plugin;
 using XivDesktop.Core.Input;
 using XivDesktop.Core.Workspaces;
+using XivDesktop.Core.Layouts;
 
 namespace XivDesktop.Plugin;
 
@@ -28,6 +29,13 @@ public sealed class Configuration : IPluginConfiguration
 
     /// <summary>Launcher grid icon size in pixels (before global scale).</summary>
     public int IconSize { get; set; } = 48;
+    public bool ClipboardBridgeEnabled { get; set; }
+    public bool AppNotificationsEnabled { get; set; }
+    public bool AppNotificationsTitleOnly { get; set; } = true;
+    public bool ControllerRingEnabled { get; set; }
+    public string ControllerRingChord { get; set; } = "L3+R3";
+    public int ControllerRingDeadzone { get; set; } = 30;
+
 
     /// <summary>Close the launcher window after a successful launch.</summary>
     public bool CloseOnLaunch { get; set; } = true;
@@ -72,6 +80,22 @@ public sealed class Configuration : IPluginConfiguration
     public bool WorkspacesHide { get; set; } = true;
 
     public int CurrentWorkspace { get; set; } = 1;
+
+    public Dictionary<uint, int> JobWorkspaces { get; set; } = [];
+
+    public bool StowInCombat { get; set; }
+    public bool StowInDuty { get; set; }
+    public bool StowOnDutyPop { get; set; }
+    public List<string> StowExceptions { get; set; } = [];
+    public string ScratchpadPin { get; set; } = "pet";
+
+    public bool VeilInGpose { get; set; } = true;
+    public List<string> PrivateApps { get; set; } = [];
+    public List<Core.Privacy.PrivatePanelMark> PrivatePanels { get; set; } = [];
+
+    public Dictionary<uint, ZoneLayoutRule> ZoneLayouts { get; set; } = [];
+
+    public List<DeskPlate> Plates { get; set; } = [];
 
     public List<WorkspaceEntry> Workspaces { get; set; } = [];
 
@@ -189,10 +213,21 @@ public sealed class Configuration : IPluginConfiguration
         config.Keybinds ??= [];
         if (config.Keybinds.Count == 0)
             config.Keybinds = Core.Input.Keybinds.Defaults(config.ModifierPreset);
+        // Add newly introduced actions without replacing any player's existing choices.
+        var defaults = Core.Input.Keybinds.Defaults(config.ModifierPreset);
+        foreach (var action in new[] { KeyAction.ScratchpadStash, KeyAction.ScratchpadSummon, KeyAction.Veil })
+            if (!config.Keybinds.ContainsKey(action)) config.Keybinds[action] = defaults[action];
         config.TerminalLine = string.IsNullOrWhiteSpace(config.TerminalLine) ? "new" : config.TerminalLine;
         config.PinArgs = string.IsNullOrWhiteSpace(config.PinArgs) ? "here" : config.PinArgs;
         config.PinFrontArgs = string.IsNullOrWhiteSpace(config.PinFrontArgs) ? "here" : config.PinFrontArgs;
         config.Workspaces ??= [];
+        config.Plates ??= [];
+        config.ZoneLayouts ??= [];
+        config.JobWorkspaces ??= [];
+        config.StowExceptions ??= [];
+        config.PrivateApps ??= [];
+        config.PrivatePanels ??= [];
+        config.ScratchpadPin = string.IsNullOrWhiteSpace(config.ScratchpadPin) ? "pet" : config.ScratchpadPin;
         config.TerminalProfile ??= "";
         config.TerminalPin = string.IsNullOrWhiteSpace(config.TerminalPin) ? "pet" : config.TerminalPin;
         config.CurrentWorkspace = Math.Clamp(config.CurrentWorkspace, 1, WorkspaceModel.Count);

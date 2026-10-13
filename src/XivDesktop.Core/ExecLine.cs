@@ -132,6 +132,64 @@ public static class ExecLine
         return parts.Count == 0 ? null : string.Join(' ', parts);
     }
 
+    /// <summary>Expand file field codes and quote every argument after substitution, never interpolating shell text.</summary>
+    public static string? OpenCommand(string exec, IReadOnlyList<string> files)
+    {
+        if (files.Count == 0 || files.Count > 32 || files.Any(p => !p.StartsWith('/') || p.Any(char.IsControl))
+            || exec.Any(char.IsControl)) return null;
+        var args = Split(exec);
+        if (args is not { Count: > 0 } || string.IsNullOrWhiteSpace(StripFieldCodes(args[0]))) return null;
+        var expanded = new List<string>();
+        var fieldCount = 0;
+        for (var n = 0; n < args.Count; n++)
+        {
+            var arg = args[n];
+            var value = new StringBuilder();
+            var removed = false;
+            var multiple = false;
+            for (var i = 0; i < arg.Length; i++)
+            {
+                if (arg[i] != '%' || i + 1 == arg.Length) { value.Append(arg[i]); continue; }
+                var code = arg[++i];
+                if (code == '%') { value.Append('%'); continue; }
+                if (code is 'f' or 'F' or 'u' or 'U')
+                {
+                    if (n == 0 || ++fieldCount > 1) return null;
+                    if (code is 'F' or 'U')
+                    {
+                        if (arg.Length != 2) return null; // several files must occupy whole arguments
+                        expanded.AddRange(files.Select(p => code == 'U' ? FileUri(p) : p));
+                        multiple = true;
+                    }
+                    else
+                    {
+                        if (files.Count != 1) return null;
+                        value.Append(code == 'u' ? FileUri(files[0]) : files[0]);
+                    }
+                }
+                else removed = true;
+            }
+            if (!multiple && !(removed && value.Length == 0)) expanded.Add(value.ToString());
+        }
+        // An explicit Open With request still supplies files to apps whose Exec has no file field.
+        if (fieldCount == 0) expanded.AddRange(files);
+        return string.Join(' ', expanded.Select(ShellQuote));
+    }
+
+    public static string FileUri(string linuxPath)
+        => "file://" + string.Join('/', linuxPath.Split('/').Select(Uri.EscapeDataString));
+
+    public static bool TakesMultipleFiles(string exec)
+    {
+        for (var i = 0; i + 1 < exec.Length; i++)
+            if (exec[i] == '%')
+            {
+                var code = exec[++i];
+                if (code is 'F' or 'U') return true;
+            }
+        return false;
+    }
+
     /// <summary>Quotes one argument for POSIX sh: bare when it only has safe characters, else single-quoted.</summary>
     public static string ShellQuote(string arg)
     {

@@ -19,6 +19,9 @@ public sealed class CatalogService : IDisposable
     private volatile AppCatalog? agentCatalog;                // ghostty-agent's list, when it sends one
     private volatile bool scanning;
     private int agentBuild;
+    private volatile IReadOnlyList<XivDesktop.Core.Windows.AgentApp> lastAgentApps = [];
+    private volatile bool disposed;
+    private long lastScanMs = -1;
 
     public CatalogService(IDalamudPluginInterface pi, IPluginLog log, Func<string> homeOverride)
     {
@@ -31,7 +34,38 @@ public sealed class CatalogService : IDisposable
     /// ghostty-agent's app list when it has one (it reads the host's .desktop files, which a sandboxed game
     /// cannot see), else the Z:\ directory scan.
     /// </summary>
-    public AppCatalog Catalog => agentCatalog is { Apps.Count: > 0 } a ? a : catalog;
+    public AppCatalog IconSource => agentCatalog is { Apps.Count: > 0 } a ? a : catalog;
+    private volatile AppCatalog? renderedSource;
+    private volatile AppCatalog? renderedCatalog;
+    private int iconBuildBusy;
+    private int requestedIconSize;
+    public AppCatalog Catalog => ReferenceEquals(renderedSource, IconSource) && renderedCatalog is { } rendered ? rendered : IconSource;
+
+    public void SetRenderedIcons(int size, IReadOnlyList<SvgIconReply> replies)
+    {
+        Volatile.Write(ref requestedIconSize, size);
+        if (disposed || replies.Count == 0 || Interlocked.CompareExchange(ref iconBuildBusy, 1, 0) != 0) return;
+        var source = IconSource;
+        _ = Task.Run(() =>
+        {
+            try
+            {
+                var paths = Paths();
+                var next = SvgIconRequests.ApplyCatalog(source, size, replies, path =>
+                {
+                    var local = paths.ToLocal(path);
+                    return File.Exists(local) ? local : null;
+                });
+                if (disposed || !ReferenceEquals(source, IconSource) || size != Volatile.Read(ref requestedIconSize)) return;
+                if (next.Apps.Zip(Catalog.Apps).All(pair => pair.First.IconPath == pair.Second.IconPath && pair.First.IconKind == pair.Second.IconKind)) return;
+                renderedCatalog = next;
+                renderedSource = source;
+                RaiseChanged();
+            }
+            catch (Exception ex) { log.Debug(ex, "XivDesktop: applying rendered icons failed"); }
+            finally { Volatile.Write(ref iconBuildBusy, 0); }
+        });
+    }
 
     /// <summary>The directory scan alone.</summary>
     public AppCatalog Scanned => catalog;
@@ -45,6 +79,15 @@ public sealed class CatalogService : IDisposable
     /// </summary>
     public void SetAgentApps(IReadOnlyList<XivDesktop.Core.Windows.AgentApp> apps)
     {
+        if (disposed) return;
+        lastAgentApps = apps.ToArray();
+        RebuildAgentCatalog();
+    }
+
+    private void RebuildAgentCatalog()
+    {
+        if (disposed) return;
+        var apps = lastAgentApps;
         var build = Interlocked.Increment(ref agentBuild);
         if (apps.Count == 0)
         {
@@ -59,7 +102,7 @@ public sealed class CatalogService : IDisposable
             {
                 var paths = Paths();
                 var next = AgentCatalog.Build(apps, AgentCatalog.IconMapper(paths.ToLocal, new IconResolver(paths)), catalog);
-                if (build != Volatile.Read(ref agentBuild))
+                if (disposed || build != Volatile.Read(ref agentBuild))
                     return;
                 agentCatalog = next;
                 log.Information("XivDesktop: {Apps} apps from ghostty-agent ({Png} with icons)", next.Apps.Count, next.Stats.IconsPng);
@@ -96,6 +139,8 @@ public sealed class CatalogService : IDisposable
     }
 
     public bool Scanning => scanning;
+
+    public double? LastScanMs => Interlocked.Read(ref lastScanMs) is var ms && ms >= 0 ? ms : null;
 
     public string LastError { get; private set; } = "";
 
@@ -134,6 +179,9 @@ public sealed class CatalogService : IDisposable
             if (token.IsCancellationRequested)
                 return;
             catalog = next;
+            Interlocked.Exchange(ref lastScanMs, sw.ElapsedMilliseconds);
+            // Host apps often arrive before this directory scan. Merge the newly discovered Exec, actions, and MIME types.
+            if (lastAgentApps.Count > 0) RebuildAgentCatalog();
             LastError = next.Errors.Count > 0 ? next.Errors[0] : "";
             var s = next.Stats;
             log.Information(
@@ -167,6 +215,8 @@ public sealed class CatalogService : IDisposable
 
     public void Dispose()
     {
+        disposed = true;
+        Interlocked.Increment(ref agentBuild);
         lock (gate)
         {
             scanCts?.Cancel();

@@ -40,6 +40,8 @@ public sealed class CommandRunner
     public Func<string, string> ArcadeLaunch { get; set; } = _ => "error: XivArcade is not installed";
 
     /// <summary>Brings the Claude panel up.</summary>
+    public Action<string> OpenFileWith { get; set; } = _ => { };
+
     public Action ShowClaude { get; set; } = () => { };
 
     public PaletteContext Context()
@@ -50,11 +52,12 @@ public sealed class CommandRunner
             Apps = desktop.Catalog.Catalog.Apps,
             Favourites = desktop.Favourites,
             Recents = desktop.Recents,
-            Windows = session.Windows.Snapshot.Windows,
-            Panels = session.Windows.PanelSnapshot,
+            Windows = session.VisibleWindows,
+            Panels = session.VisiblePanels,
             TargetWindow = target?.Id,
             WorkspaceOf = session.WorkspaceOf,
             CurrentWorkspace = session.CurrentWorkspace,
+            Plates = session.Veiled ? [] : session.Plates,
             GhosttyAvailable = desktop.Backend.Available,
             WindowsAvailable = session.Windows.WindowsAvailable,
             CanLaunch = a => desktop.CanLaunch(a, out _),
@@ -63,10 +66,10 @@ public sealed class CommandRunner
             ClaudeReason = Claude == null ? "the Claude panel is not loaded"
                 : Claude.Transport.Ready ? null
                 : Claude.Transport.Problem,
-            ClaudeSessions = Claude?.Sessions
+            ClaudeSessions = session.Veiled ? [] : Claude?.Sessions
                 .Select(s => (s.Key, $"{s.Look.Nameplate} · {s.Conversation.Activity.ToString().ToLowerInvariant()}"))
                 .ToList() ?? [],
-            ClaudeRecent = Claude?.Remembered
+            ClaudeRecent = session.Veiled ? [] : Claude?.Remembered
                 .Where(r => Claude.Sessions.All(s => !string.Equals(s.Key, r.Key, StringComparison.OrdinalIgnoreCase)))
                 .Take(8)
                 .Select(r => (r.Key, r.Summary(DateTimeOffset.UtcNow)))
@@ -80,6 +83,13 @@ public sealed class CommandRunner
         {
             switch (c.Kind)
             {
+                case PaletteCommand.Plate:
+                    return session.ApplyPlate(c.Arg);
+                case PaletteCommand.OpenFile:
+                    OpenFileWith(c.Arg);
+                    return "ok: choose files to open";
+                case PaletteCommand.LaunchAction:
+                    return desktop.LaunchAction(c.Arg, c.Text);
                 case PaletteCommand.Launch:
                     return desktop.Launch(c.Arg);
                 case PaletteCommand.Focus:
@@ -151,6 +161,9 @@ public sealed class CommandRunner
             return move ? session.MoveTarget(n) : session.SwitchWorkspace(n);
         return action switch
         {
+            KeyAction.Veil => session.SetVeil(),
+            KeyAction.ScratchpadStash => session.StashTarget(),
+            KeyAction.ScratchpadSummon => session.SummonScratchpad(),
             KeyAction.Launcher => Do(() => TogglePalette("")),
             KeyAction.Terminal => session.OpenTerminal(),
             KeyAction.Close => session.CloseTarget(),

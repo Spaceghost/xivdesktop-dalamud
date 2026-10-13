@@ -39,6 +39,7 @@ public sealed class AppCatalog
     public static readonly AppCatalog Empty = new([], new CatalogStats(), [], DateTimeOffset.MinValue);
 
     private readonly Dictionary<string, AppInfo> byId;
+    private readonly Dictionary<string, List<AppInfo>> byMime = new(StringComparer.OrdinalIgnoreCase);
 
     public AppCatalog(IReadOnlyList<AppInfo> apps, CatalogStats stats, IReadOnlyList<string> errors, DateTimeOffset scannedAt)
     {
@@ -48,7 +49,14 @@ public sealed class AppCatalog
         ScannedAt = scannedAt;
         byId = new Dictionary<string, AppInfo>(StringComparer.OrdinalIgnoreCase);
         foreach (var app in apps)
+        {
             byId.TryAdd(app.Id, app);
+            foreach (var mime in app.MimeTypes.Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                if (!byMime.TryGetValue(mime, out var list)) byMime[mime] = list = [];
+                list.Add(app);
+            }
+        }
     }
 
     public IReadOnlyList<AppInfo> Apps { get; }
@@ -59,6 +67,9 @@ public sealed class AppCatalog
     public IReadOnlyList<string> Errors { get; }
 
     public DateTimeOffset ScannedAt { get; }
+
+    public IReadOnlyList<AppInfo> AppsForMime(string mime)
+        => byMime.TryGetValue(mime, out var list) ? list : [];
 
     /// <summary>Looks up by desktop-file id; "org.foo.Bar" and "org.foo.Bar.desktop" both work.</summary>
     public AppInfo? Find(string id)
@@ -212,8 +223,10 @@ public sealed class AppCatalog
                 Comment = e.Comment,
                 Keywords = e.Keywords,
                 Categories = e.Categories,
+                MimeTypes = e.MimeTypes,
                 Exec = e.Exec,
                 Command = command,
+                Actions = e.Actions,
                 Terminal = e.Terminal,
                 Icon = e.Icon,
                 IconKind = kind,
