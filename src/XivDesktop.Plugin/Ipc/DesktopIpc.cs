@@ -23,6 +23,8 @@ public sealed class DesktopIpc : IDisposable
     private readonly ICallGateProvider<int, string> workspace;
     private readonly ICallGateProvider<string, string> palette;
     private readonly ICallGateProvider<string, string> windowAction;
+    private readonly ICallGateProvider<string> plates;
+    private readonly ICallGateProvider<string, string> applyPlate;
     private readonly IFramework framework;
 
     public DesktopIpc(IDalamudPluginInterface pi, IFramework framework, IPluginLog log, DesktopService desktop, SessionService session, CommandRunner runner, Action<string> toggleWindow)
@@ -44,6 +46,11 @@ public sealed class DesktopIpc : IDisposable
             return 0;
         }, 0));
         toggleFavourite.RegisterFunc(id => Guard(() => !string.IsNullOrWhiteSpace(id) && desktop.ToggleFavourite(id), false));
+
+        plates = pi.GetIpcProvider<string>(IpcContract.Plates);
+        applyPlate = pi.GetIpcProvider<string, string>(IpcContract.ApplyPlate);
+        plates.RegisterFunc(() => Guard(() => OnFramework(() => IpcContract.Serialize(new { plates = session.Veiled ? [] : session.Plates, status = session.Veiled ? "Privacy veil active" : session.PlateStatus })), "{}"));
+        applyPlate.RegisterFunc(name => Guard(() => OnFramework(() => session.ApplyPlate(name ?? "")), "error: internal error"));
 
         windows = pi.GetIpcProvider<string>(IpcContract.Windows);
         workspace = pi.GetIpcProvider<int, string>(IpcContract.Workspace);
@@ -118,6 +125,8 @@ public sealed class DesktopIpc : IDisposable
         status.UnregisterFunc();
         toggleLauncher.UnregisterAction();
         toggleFavourite.UnregisterFunc();
+        plates.UnregisterFunc();
+        applyPlate.UnregisterFunc();
         windows.UnregisterFunc();
         workspace.UnregisterFunc();
         palette.UnregisterFunc();

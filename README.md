@@ -174,15 +174,31 @@ sandboxed game can see through Wine.
 | `/desktop`, `/desktop <text>` | Toggle the palette, or open it with a query. |
 | `/desktop apps [search]` | Open the app grid. |
 | `/desktop settings` | General, keybind, window and workspace settings. |
+| `/desktop doctor` | Check the catalog, Ghostty IPC, agent and focus; optionally test an app launch. |
 | `/desktop status`, `/desktop windows` | Catalog/backend summary, or panel listing in chat. |
 | `/desktop launch <id or search>` | Launch by desktop-file ID, exact name or best match. |
 | `/desktop ws <1-9>` | Switch workspace. |
+| `/desktop veil [on|off|toggle]` | Control the privacy veil (Super+V by default). |
+| `/desktop stash` | Put the focused panel in the scratchpad. |
+| `/desktop scratchpad` | Summon the scratchpad here; one panel toggles, several cycle. |
 | `/desktop reload` | Rescan application directories off the framework thread. |
 
 App-grid favourites and recents are stored in `pluginConfigs/XivDesktop.json`.
-Right-click an app for favourite/launch/copy-command actions. A missing icon
+Right-click an app for favourites, launch, the actions listed by its `.desktop` file (such as New Window), or copying its shell command. **Copy game macro** copies `/desktop launch <desktop-file id>` for a hotbar macro; the id stays stable across rescans. The palette offers the same app actions and **Copy macro** (Ctrl+Shift+C). Actions require access to the `.desktop` file through the directory scan; an app known only to the host agent has its normal launch action. A missing icon
 can be a letter tile rather than a broken entry: the icon loader supports PNG,
 not SVG.
+
+Settings → Windows also lets you assign a workspace to each job. A real job change selects that workspace once; your manual switches remain until the next job change. An unmapped job keeps the current workspace.
+
+The same tab offers optional stowing during combat, while inside a duty, and when the duty confirmation window appears. Select apps to keep visible, such as voice chat. Panels opened while stowed are hidden too; leaving the condition restores the previously visible panels after a short settle delay. Workspace assignments stay intact. These switches start off.
+
+The scratchpad is separate from the nine numbered workspaces. **Super+Shift+Minus** stashes the focused panel; **Super+Minus** summons it on your current workspace. A single panel toggles; multiple panels cycle. Stashed panels stay hidden across workspace switches, even if normal workspace hiding is off. Assignments are saved, but summoned state is temporary, so the scratchpad starts hidden after reload.
+
+**The privacy veil** (Super+V or `/desktop veil`) masks desktop panel titles in the palette, window list, taskbar IPC, and panel notifications. Settings → Windows lets you mark private apps and individual desktop panels; these are hidden while the veil is active. Group pose enables the veil by default, and leaving group pose preserves a veil you enabled manually. Private tags are saved, with panel tags rebound by title and app after reconnect. Duty-stowing exceptions do not override private-panel hiding. This covers XivDesktop’s UI and panels it manages; other plugins’ UI and existing notifications are outside the veil.
+
+Use **Open file with…** on an app in the grid or **Ctrl+O** on its palette row to select up to 32 existing files. The app's `.desktop` file must be visible to the directory scan. Wine paths on `Z:` are mapped back to Linux; other Wine drives are refused. File and URL field codes are expanded as separate shell-quoted arguments. Apps accepting a single file are launched once per file; apps with `%F` or `%U` receive them together. Terminal apps retain the normal terminal launch route.
+
+`/desktop doctor` opens the diagnostic window. Refreshing checks never launches an app. It reports catalog counts and scan time, the launch and window IPC gates, host-agent connectivity, and the latest focus response. **Copy redacted report** omits paths, host names, app commands, window titles and raw errors. To test a launch, explicitly select a harmless installed graphical app and press the launch-test button. A queued request passes only after its matching request resolves and its panel is live; you still need to confirm that the app renders and accepts input in game.
 
 ## Launcher palette (Super+D)
 
@@ -205,6 +221,8 @@ The command provider is different: choosing a command can execute an actual
 plugin/game command and should be treated accordingly.
 
 ## Key chords
+
+Settings → Keybinds offers **Record** beside every chord. Press your combination while the game has focus; Escape cancels. Normal launcher chords are suspended while recording. After ten seconds a timeout says whether any modifiers reached the game, which helps diagnose Wine or desktop shortcut interception.
 
 Common defaults are **Super+D** for the palette, **Super+Enter** for a terminal,
 **Super+Q** to close the target window, **Super+1…9** to switch workspace, and
@@ -356,3 +374,46 @@ Maintained by [Spaceghost](https://github.com/Spaceghost). This is an independen
 third-party project built on Dalamud and Ghostty's plugin/agent infrastructure.
 Preserve dependency attribution and licensing; neither a build nor a feed
 entry establishes official approval.
+
+Named desk plates have host-tested planning and native-panel support. `/desktop plate save <name>` records live graphical and terminal apps, their workspaces, known placement arguments, and pet order; `>plate <name>` previews every piece in the palette and starts applying it. `/desktop plate list`, `delete <name>`, `status`, and `cancel` manage the saved plates and the current application. Missing apps launch one at a time, and placement and pet ordering wait for their matching queued results. Applying visits each workspace and ends on the workspace saved with the plate. Cancellation or failure keeps pieces already applied. The additive `XivDesktop.v1.Plates` and `XivDesktop.v1.ApplyPlate` IPC gates expose the same operation and status.
+
+Terminal apps launched through XivDesktop retain their catalog identity alongside workspace membership and can be reused or relaunched when applying a plate. Plain shells and adopted UI with no catalog app identity are omitted from capture. Matching Ghostty builds report full placement arguments, including HUD coordinates and fixed-pin positions and orientation relative to the character. On older builds, pinned panels must first be placed through XivDesktop. Pins left in another territory cannot be captured until brought here. Scratchpad panels are excluded from capture, and unknown graphical apps produce an error. Applying pauses no applications and closes no unrelated windows. Duty stowing or the privacy veil cancels an application; plate details are omitted from the palette and Plates IPC while veiled. In-game restoration has not been verified.
+
+Bind your current territory in Settings → Windows → Layouts by territory, or with `/desktop zone ws <1-9>` / `/desktop zone plate <name>`. `/desktop zone clear` removes its rule, `list` lists rules, and `duties on|off` changes that territory's duty opt-in. There are no rules by default. Arrival waits for loading to finish, a local player to be available for one second, pending graphical launches to finish, and any active plate, duty stow, or privacy veil to end. The rule then applies once, leaving subsequent manual workspace changes alone until another arrival or rule edit. Applying a plate can launch its missing apps. A territory transition cancels an unfinished plate, keeping pieces already applied. Failed plate applications report an error and are not retried continuously.
+
+Rules currently use territory IDs exposed by IClientState. Housing wards, plots, and instanced rooms sharing that ID share the same rule; no ward/plot identity is exposed by the client-state API used here. Nothing changes in a duty unless the rule explicitly allows it, and an active duty guard still takes precedence. Host tests cover arrival timing and guards; territory transitions and housing behavior remain unverified in game.
+
+The Umbra Windows taskbar uses resolved app icons from the additive `iconPath` fields in ListApps and Windows IPC. It shares a bounded file cache across widgets, validates images once, rechecks files after 30 seconds, and falls back to a letter tile for missing or invalid icons. Each button shows its workspace (or Bag for a scratchpad panel). Newly live panels have a thin highlight for four seconds; existing panels at initial load do not flash. The privacy veil removes window icon paths and refreshes open menu titles. SVG-only apps still need the separately voted host rasterization feature. Umbra rendering, menu behavior, and image loading in Wine remain unverified in game.
+
+SVG icon size routing is now wired: Settings → General → App icon size (24–128) is sent through the optional icon_size parameter on agent.windows.refresh. Matching agents render their app-list SVGs at that size and preserve the requested size across subsequent app-list refreshes. The renderer is host-tested at 32 and 192 pixels, and old refresh calls retain their default behavior. Compositor compilation/runtime verification and icons outside the host app list remain unfinished.
+
+Controller ring (in development): enable **Controller ring launcher** in Settings → General. Hold the configured chord (default `L3+R3`), flick the left stick toward one of the first eight available favourites, and release to launch. `L1`/`R1` change workspaces and `East` cancels. Those three buttons are reserved and cannot be part of the hold chord. Adjust the raw-stick deadzone for your controller. The game also receives the buttons, so choose an unbound chord. The ring cancels under duty stow, privacy veil, foreground loss, or ImGui gamepad navigation; in-game behavior has not been verified.
+
+Experimental clipboard bridge: settings now include an opt-in text sync toggle.
+The service runs on the UI thread, pauses during privacy veil/duty stow, baselines
+existing contents, and waits for host-write acknowledgement. Transfers require a known-safe metadata reply. Windows agent and compositor
+app offers now have metadata providers; outside-desktop Linux metadata remains
+unavailable. Runtime/game verification remains open.
+
+Game clipboard sampling now checks registered exclusion/concealed formats
+before reading text and checks the Windows clipboard sequence around the read.
+Missing API/access and changing samples are skipped. Any exclusion-format
+presence is conservatively skipped, even if its value would permit history.
+Microsoft API references: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-isclipboardformatavailable
+and https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getclipboardsequencenumber
+Wine behavior and agent metadata remain unverified/incomplete.
+
+Experimental app notifications: enable **App notification toasts (opt in)** in
+Settings → General. **App notifications: title only** defaults to enabled.
+Matching Ghostty agents provide notifications from compositor-launched apps on
+their private D-Bus session. Click a toast to focus a matching app panel, including
+switching to its workspace. Notifications without a known panel remain readable
+but have no focus target. The service does not capture the host desktop's bus.
+
+Private apps and panels, privacy veil, and duty stow suppress delivery. Existing
+toasts are scrubbed before dismissal when privacy changes. Replacements in one
+poll show only their final state; closes dismiss their toast even during a flood.
+Delivery is capped at four toasts per ten seconds. Initial connection, reconnect,
+and re-enabling establish a baseline and do not replay old messages. Production
+lifecycle tests pass; native-host IPC, Wine icon rendering, and game toast/focus
+behavior remain unverified.

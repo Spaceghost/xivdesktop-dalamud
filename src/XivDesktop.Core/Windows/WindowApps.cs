@@ -8,7 +8,7 @@ public static class WindowApps
     /// equal to the panel's <c>app</c> (what ghostty reports for a run command), a desktop-file id containing
     /// it, then an app whose name the window title ends with ("notes - Text Editor"). Null when nothing fits.
     /// </summary>
-    public static AppInfo? Find(IReadOnlyList<AppInfo> apps, WindowPanel w, string? launchedId = null)
+    public static AppInfo? Find(IReadOnlyList<AppInfo> apps, WindowPanel w, string? launchedId = null, bool allowTitleMatch = true)
     {
         if (launchedId != null)
         {
@@ -36,7 +36,7 @@ public static class WindowApps
             }
         }
 
-        if (w.Title.Length > 0)
+        if (allowTitleMatch && w.Title.Length > 0)
         {
             foreach (var a in apps)
             {

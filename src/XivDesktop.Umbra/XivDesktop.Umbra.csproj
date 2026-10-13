@@ -43,6 +43,7 @@
     <Compile Include="..\Shared\GameCursor.cs" Link="Shared\GameCursor.cs" />
     <Compile Include="..\XivDesktop.Core\DesktopEntry.cs" Link="Core\DesktopEntry.cs" />
     <Compile Include="..\XivDesktop.Core\AppSearch.cs" Link="Core\AppSearch.cs" />
+    <Compile Include="..\XivDesktop.Core\TaskbarIcons.cs" Link="Core\TaskbarIcons.cs" />
     <Compile Include="..\XivDesktop.Core\LetterTile.cs" Link="Core\LetterTile.cs" />
   </ItemGroup>
 
@@ -94,6 +95,7 @@
       <Reference Include="Umbra"><HintPath>$(UmbraLibPath)Umbra.dll</HintPath><Private>false</Private></Reference>
       <Reference Include="Umbra.Common"><HintPath>$(UmbraLibPath)Umbra.Common.dll</HintPath><Private>false</Private></Reference>
       <Reference Include="Umbra.Game"><HintPath>$(UmbraLibPath)Umbra.Game.dll</HintPath><Private>false</Private></Reference>
+      <Reference Include="SkiaSharp"><HintPath>$(UmbraLibPath)SkiaSharp.dll</HintPath><Private>false</Private></Reference>
       <Reference Include="Una.Drawing"><HintPath>$(UmbraLibPath)Una.Drawing.dll</HintPath><Private>false</Private></Reference>
     </ItemGroup>
   </Target>

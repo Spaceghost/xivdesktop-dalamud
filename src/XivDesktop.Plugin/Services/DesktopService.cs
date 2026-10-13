@@ -73,7 +73,28 @@ public sealed class DesktopService
         return reason == null;
     }
 
-    public string Launch(AppInfo app)
+    public string LaunchAction(string appId, string actionId)
+    {
+        var app = Catalog.Catalog.Apps.FirstOrDefault(a => a.Id == appId);
+        var target = app == null ? null : LaunchPlan.ActionApp(app, actionId);
+        return target == null ? Fail("the app action is no longer in the catalog (try /desktop reload)") : Launch(target);
+    }
+
+    public string OpenFiles(string appId, IReadOnlyList<string> paths)
+    {
+        var app = Catalog.Catalog.Find(appId);
+        if (app == null) return Fail("the selected app is no longer in the catalog");
+        var plan = OpenWithPlan.Build(app, paths);
+        if (plan.Error is { } error) return Fail(error);
+        foreach (var target in plan.Apps)
+        {
+            var result = Launch(target);
+            if (!result.StartsWith("ok", StringComparison.Ordinal)) return result;
+        }
+        return $"ok: sent {paths.Count} file(s) to {app.Name}";
+    }
+
+    public string Launch(AppInfo app, Action<long>? onPanel = null)
     {
         if (!Backend.Available)
             return Fail(Backend.MissingMessage);
@@ -86,7 +107,7 @@ public sealed class DesktopService
             if (Backend is IWindowManager { WindowsAvailable: true } windows)
             {
                 var target = LaunchPlan.Plan(app).Target!;
-                void Remember(long panel) => LaunchedApps[panel] = app.Id;
+                void Remember(long panel) { LaunchedApps[panel] = app.Id; onPanel?.Invoke(panel); }
                 string result;
                 switch (target.Kind)
                 {
@@ -196,8 +217,10 @@ public sealed class DesktopService
                 Favourite = UserLists.Contains(fav, a.Id),
                 Keywords = [.. a.Keywords],
                 Recent = r >= 0 ? r : null,
+                IconPath = a.IconPath,
                 Terminal = a.Terminal,
                 Launchable = CanLaunch(a, out _),
+                Actions = a.Actions.Select(x => new AppActionSummary(x.Id, x.Name, x.Icon)).ToList(),
             };
         }).ToList();
     }

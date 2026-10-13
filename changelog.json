@@ -7,11 +7,103 @@
       "version": "next",
       "title": "In development",
       "date": "2026-10-11",
-      "blurb": "Timeout handling is host-built; live question and timeout acceptance remains pending.",
+      "blurb": "Host-tested feature work; live game acceptance remains pending.",
       "items": [
         {
           "status": "beta",
+          "text": "Malformed Unicode escapes in Ghostty IPC replies are rejected before downstream readers inspect them. Invalid numeric request/revision fields and malformed Arcade strings also return an empty result instead of throwing. Includes deterministic regressions for the input found by CI fuzzing."
+        },
+        {
+          "status": "beta",
+          "text": "Experimental desktop feature build: app actions and macro copying, key-chord recording, workspace stowing and privacy masking, desk-plate and zone policies, notification handling, SVG icon requests and the optional controller ring. Offline logic tests and builds are available; compositor transport, clipboard integration and live game/controller acceptance retain the limits documented in accepted-votes.json. This build does not certify every planned feature."
+        },
+        {
+          "status": "beta",
           "text": "Ask an NPC now reports a timeout for the request that is still active. Cancellation tokens were compared by object identity, which always failed after boxing the value types and suppressed the error. Value equality preserves suppression for dismissed or replaced questions."
+        },
+        {
+          "status": "next",
+          "text": "Right-click apps to use the actions listed in their .desktop files, such as New Window. The palette offers the same actions. Commands use the existing launch backend and terminal handling; agent-listed apps retain actions when their .desktop file is visible to the directory scan."
+        },
+        {
+          "status": "next",
+          "text": "Copy game macro from the app grid, or Copy macro (Ctrl+Shift+C) in the palette, copies /desktop launch <desktop-file id> for a hotbar macro. The desktop id stays stable across rescans."
+        },
+        {
+          "status": "next",
+          "text": "Record a key chord directly in Settings \u2192 Keybinds. Launcher actions are suspended during recording, Escape cancels, and the ten-second timeout reports whether modifiers reached the game."
+        },
+        {
+          "status": "next",
+          "text": "Change job, change workspace: assign workspaces to jobs in Settings \u2192 Windows. Only a job change or an edited mapping switches workspace, leaving manual switches intact between changes."
+        },
+        {
+          "status": "next",
+          "text": "Optional stowing during combat, inside duties, or when the duty confirmation appears, with apps you can keep visible. Panels opened during the condition are stowed too; previously visible panels return after a short settle delay."
+        },
+        {
+          "status": "next",
+          "text": "The scratchpad: /desktop stash puts the focused panel away; /desktop scratchpad summons it on any workspace. Super+Shift+Minus and Super+Minus are the defaults. One panel toggles and several cycle, with scratchpad membership saved across reconnects."
+        },
+        {
+          "status": "next",
+          "text": "Open file with\u2026 in the app grid and Ctrl+O in the palette let you choose host files and open them with the selected app. Wine Z: paths map back to Linux, file/URL arguments are quoted, single-file apps launch once per selected file, and terminal apps keep their terminal route. The app\u2019s .desktop file must be visible to the directory scan."
+        },
+        {
+          "status": "next",
+          "text": "/desktop doctor checks the catalog, scan time, Ghostty IPC, host agent, and focus response, and copies a report without paths, commands, host names, or window titles. An optional launch test runs only the graphical app you select and requires its matching queued request to resolve into a live panel; visual behavior still needs an in-game check."
+        },
+        {
+          "status": "next",
+          "text": "The privacy veil: Super+V or /desktop veil masks panel titles in the palette, window list, Umbra taskbar payload, and panel notifications. Mark private apps or individual desktop panels in Settings \u2192 Windows to hide them while veiled. Group pose enables the veil by default, with the manual choice preserved afterward. Duty-stowing exceptions never override private-panel hiding, and one visibility controller restores panels only when every reason to hide them ends."
+        },
+        {
+          "status": "next",
+          "text": "Named desk plates in development: save graphical apps, workspaces and known placements with /desktop plate save, preview pieces using >plate, and apply with tracked launch callbacks and acknowledged placement/order requests. Includes status, cancellation and additive Plates/ApplyPlate IPC. Matching Ghostty builds expose complete placement arguments, including relative fixed-pin poses; terminal apps participate through native panel IPC; behavior has not been observed in game."
+        },
+        {
+          "status": "next",
+          "text": "Desk plates reuse and launch terminal apps as well as graphical windows. Native world terminals retain catalog app identity and workspace membership across persistence/rebinding, and HUD panels follow workspace visibility. Plain shells without catalog identity are omitted from plate capture. Newly launched terminals wait for the existing delayed command-send interval before placement; in-game behavior still needs verification."
+        },
+        {
+          "status": "next",
+          "text": "Bind the current territory to a saved desk plate or workspace in Settings \u2192 Windows, or with /desktop zone. Arrival waits for loading, player availability and active desk operations, then applies once. Duties require a per-rule opt-in; stowing and the privacy veil still take precedence. Shared housing/instance territory IDs share a rule. Host-tested; in-game transitions remain unverified."
+        },
+        {
+          "status": "next",
+          "text": "The Umbra Windows taskbar draws resolved app icons with a shared bounded cache and letter fallback, shows each panel workspace, and highlights newly live panels for four seconds. Icon paths are additive IPC fields and are omitted from Windows while veiled; open menus refresh from masked payloads. SVG-only coverage and in-game rendering verification remain outstanding."
+        },
+        {
+          "status": "next",
+          "text": "Host SVG icon work in progress: Ghostty already has background SVG rendering, and its cache now distinguishes source paths and modification metadata so theme/icon updates do not reuse stale artwork. Configured-size requests and complete SVG-only coverage remain unfinished; compositor integration and in-game behavior still need verification."
+        },
+        {
+          "status": "next",
+          "text": "SVG icon size routing in development: Settings \u2192 General sends App icon size through Ghostty refresh IPC to a sized app-list renderer. Real host SVG tests verify 32- and 192-pixel PNGs; old refresh calls retain their default behavior. Arbitrary scanned-icon routing, matching Wayland integration, and in-game checks remain unfinished."
+        },
+        {
+          "status": "next",
+          "text": "Standalone SVG request components in development: Core batches and deduplicates scanned icons, matches replies by icon and size, and changes only icon metadata. Host rendering accepts SVG paths independently of installed-app rows and reuses its source-aware cache. Transport and catalog hookup remain unfinished."
+        },
+        {
+          "status": "next",
+          "text": "Standalone SVG reply transport in development: Ghostty accepts metadata-only icon rows and exposes them through agent.icons without replacing windows or launchable app lists. Repeated replies update the matching icon/size, and XivDesktop parses valid replies separately from app metadata. Request forwarding and catalog hookup remain unfinished."
+        },
+        {
+          "status": "next",
+          "text": "Standalone SVG request forwarding in development: agent.icons.render carries bounded icon names and size to the host background renderer, independently of launchable app rows. Native IPC verifies the exact payload; XivDesktop now serializes matching requests. Catalog polling/application and compositor runtime verification remain unfinished."
+        },
+        {
+          "status": "next",
+          "text": "SVG catalog integration in development: scanned SVG-only icons request host rendering at the configured size, poll standalone replies, and become PNG icons only after the file is accessible. File checks run off the game frame thread; icon updates preserve launch commands and scan evidence. Requests retry periodically and restart for scan, size, or connection changes. Matching compositor compilation and in-game rendering remain unverified."
+        },
+        {
+          "status": "next",
+          "text": "Controller ring input rules in development: up to eight favourites are frozen while the hold chord is active, stick flicks select clockwise sectors, release launches once, and shoulder edges step workspaces. Cancellation and focus loss require releasing the chord before rearming. Gamepad settings, radial UI, and in-game verification remain unfinished."
+        },
+        {
+          "status": "next",
+          "text": "Controller ring integration in development: enable it in General, choose a named-button hold chord (default L3+R3), and adjust the raw-stick deadzone. The first eight available favourites form a radial icon ring; flick the left stick and release to launch. L1/R1 wrap workspaces and East cancels. Duty stow, privacy veil, foreground loss and ImGui gamepad navigation cancel the ring. Buttons remain visible to the game; controller behavior still needs in-game verification."
         }
       ]
     },
