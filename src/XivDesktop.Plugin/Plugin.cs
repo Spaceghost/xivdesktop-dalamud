@@ -1,6 +1,7 @@
 using Dalamud.Game.Command;
 using Dalamud.Interface.ImGuiNotification;
 using Dalamud.Interface.Windowing;
+using Dalamud.Interface.ImGuiFileDialog;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
 using XivDesktop.Plugin.Claude;
@@ -30,11 +31,14 @@ public sealed class Plugin : IDalamudPlugin
 
     private readonly List<IDisposable> disposables = [];
     private readonly WindowSystem windowSystem = new("XivDesktop");
+    private readonly FileDialogManager fileDialogs = new();
     private readonly DesktopService desktop = null!;
     private readonly SessionService session = null!;
     private readonly LauncherWindow launcher = null!;
     private readonly PaletteWindow palette = null!;
     private readonly SettingsWindow settings = null!;
+    private readonly ClipboardBridgeService clipboardBridge = null!;
+    private readonly DoctorWindow doctorWindow = null!;
     private readonly ClaudeWindow claudePanel = null!;
     private readonly ClaudePermissionWindow claudePermission = null!;
     private readonly ClaudeService claude = null!;
@@ -55,7 +59,9 @@ public sealed class Plugin : IDalamudPlugin
         IDataManager data,
         IClientState clientState,
         ICondition condition,
-        IObjectTable objects)
+        IObjectTable objects,
+        IGameGui gameGui,
+        IGamepadState gamepad)
     {
         this.notifications = notifications;
         this.pluginInterface = pluginInterface;
@@ -70,8 +76,16 @@ public sealed class Plugin : IDalamudPlugin
             var catalog = Track(new CatalogService(pluginInterface, log, () => config.HomeOverride));
             // GhosttyDalamud.v1.Call when registered; it falls back to the Post gate for launching.
             var ghostty = Track(new GhosttyCallBackend(pluginInterface, framework, log));
+            ghostty.IconPixels = () => config.IconSize;
+            ghostty.SvgIconCatalog = () => catalog.IconSource;
+            ghostty.RenderedIcons = catalog.SetRenderedIcons;
             desktop = new DesktopService(pluginInterface, framework, log, config, catalog, ghostty);
             session = Track(new SessionService(ghostty, ghostty.Post, desktop, config, framework, notifications, log));
+            clipboardBridge = new ClipboardBridgeService(config, ghostty, session);
+            Track(new AppNotificationService(config, ghostty, session, desktop, framework, notifications));
+            Track(new DesktopContextService(framework, objects, condition, clientState, gameGui, config, session, log));
+            var doctor = Track(new DoctorService(desktop, ghostty, framework, log));
+            doctorWindow = new DoctorWindow(doctor, desktop);
             var runner = new CommandRunner(desktop, session, commands, log);
 
             // XivArcade is a separate, optional mod: when it is loaded, the palette finds its games over IPC.
@@ -81,12 +95,14 @@ public sealed class Plugin : IDalamudPlugin
             runner.ArcadeLaunch = id => ArcadeCall(arcadeLaunch, id) ?? "error: XivArcade is not installed";
 
             launcher = new LauncherWindow(desktop, textures, config);
+            launcher.OpenFileWith = PickFiles;
+            runner.OpenFileWith = PickFiles;
             palette = new PaletteWindow(runner, desktop, session, textures, pluginInterface, config);
             runner.TogglePalette = palette.Toggle;
             runner.ToggleGrid = launcher.Toggle;
-            var keybinds = Track(new KeybindService(framework, keys, log, config, action => OnKey(runner, action), () => ghostty.KeyboardFocus is { Id: > 0 }));
+            var keybinds = Track(new KeybindService(framework, keys, log, config, action => OnKey(runner, action), () => ghostty.KeyboardFocus is { Id: > 0 }, desktop.Save));
             ghostty.AgentAppsChanged += catalog.SetAgentApps;
-            settings = new SettingsWindow(config, desktop, session, keybinds);
+            settings = new SettingsWindow(config, desktop, session, keybinds, data);
 
             // Claude in game: the agent connection, the permission server, the panel and the NPC bridge.
             claude = Track(new ClaudeService(
@@ -103,9 +119,12 @@ public sealed class Plugin : IDalamudPlugin
             runner.ShowClaude = claudePanel.Show;
             settings.Claude = claude;
 
+            var ring = Track(new ControllerRingWindow(framework, gamepad, clientState, textures, config, desktop, session, log));
+            windowSystem.AddWindow(ring);
             windowSystem.AddWindow(launcher);
             windowSystem.AddWindow(palette);
             windowSystem.AddWindow(settings);
+            windowSystem.AddWindow(doctorWindow);
             windowSystem.AddWindow(claudePanel);
             windowSystem.AddWindow(claudePermission);
             pluginInterface.UiBuilder.Draw += DrawUi;
@@ -114,7 +133,7 @@ public sealed class Plugin : IDalamudPlugin
 
             commandRegistered = commands.AddHandler(Command, new CommandInfo(OnCommand)
             {
-                HelpMessage = "Toggle the launcher palette. \"/desktop apps\" (app grid), \"/desktop settings\", \"/desktop ws <1-9>\", \"/desktop windows\", \"/desktop launch <app>\", \"/desktop reload\", \"/desktop status\", \"/desktop <query>\".",
+                HelpMessage = "Toggle the launcher palette. \"/desktop apps\" (app grid), \"/desktop doctor\", \"/desktop settings\", \"/desktop ws <1-9>\", \"/desktop stash\", \"/desktop scratchpad\", \"/desktop windows\", \"/desktop launch <app>\", \"/desktop reload\", \"/desktop status\", \"/desktop <query>\".",
             });
 
             claudeCommandRegistered = commands.AddHandler(ClaudeCommandName, new CommandInfo(OnClaudeCommand)
@@ -165,7 +184,9 @@ public sealed class Plugin : IDalamudPlugin
         try
         {
             claudePermission.Sync();
+            clipboardBridge.Tick();
             windowSystem.Draw();
+            fileDialogs.Draw();
 
             // "Always the in-game cursor": keep Dalamud from swapping it while over our windows.
             var over = false;
@@ -177,6 +198,16 @@ public sealed class Plugin : IDalamudPlugin
         {
             log.Error(ex, "XivDesktop UI draw failed");
         }
+    }
+
+    private void PickFiles(string appId)
+    {
+        var app = desktop.Catalog.Catalog.Find(appId);
+        if (app == null || app.Exec.Length == 0) { Print("error: the app's .desktop file must be visible to open files"); return; }
+        fileDialogs.OpenFileDialog("Open with " + app.Name, ".*", (bool selected, List<string> paths) =>
+        {
+            if (selected) Print(desktop.OpenFiles(appId, paths));
+        }, 32, OperatingSystem.IsWindows() ? @"Z:\" : "/", false);
     }
 
     private void OpenMainUi() => palette.Toggle("");
@@ -226,6 +257,29 @@ public sealed class Plugin : IDalamudPlugin
                 case "ws" or "workspace":
                     Print(int.TryParse(rest, out var n) ? session.SwitchWorkspace(n) : $"workspace {session.CurrentWorkspace}; usage: {Command} ws <1-9>");
                     break;
+                case "zone":
+                    Print(session.ZoneCommand(rest));
+                    break;
+                case "plate":
+                    Print(session.PlateCommand(rest));
+                    break;
+                case "veil":
+                    Print(rest.ToLowerInvariant() switch
+                    {
+                        "on" => session.SetVeil(true), "off" => session.SetVeil(false),
+                        "" or "toggle" => session.SetVeil(),
+                        _ => "usage: /desktop veil [on|off|toggle]",
+                    });
+                    break;
+                case "doctor":
+                    doctorWindow.Show();
+                    break;
+                case "stash":
+                    Print(session.StashTarget());
+                    break;
+                case "scratchpad":
+                    Print(session.SummonScratchpad());
+                    break;
                 case "windows":
                     PrintWindows();
                     break;
@@ -246,7 +300,7 @@ public sealed class Plugin : IDalamudPlugin
                     ask?.Run(rest);
                     break;
                 case "help":
-                    Print($"{Command} toggles the launcher palette; {Command} apps (app grid); {Command} settings; {Command} ws <1-9>; {Command} windows; {Command} launch <app>; {Command} reload; {Command} status; {Command} <text> opens the palette with a query.");
+                    Print($"{Command} toggles the launcher palette; {Command} apps (app grid); {Command} settings; {Command} doctor; {Command} plate <list|save|apply|delete|status|cancel>; {Command} zone <ws|plate|clear|duties|list>; {Command} veil [on|off]; {Command} stash; {Command} scratchpad; {Command} ws <1-9>; {Command} windows; {Command} launch <app>; {Command} reload; {Command} status; {Command} <text> opens the palette with a query.");
                     break;
                 default:
                     palette.Toggle(args);
@@ -350,7 +404,7 @@ public sealed class Plugin : IDalamudPlugin
 
     private void PrintWindows()
     {
-        var list = session.OpenPanels();
+        var list = session.VisibleWindows.Where(w => !w.IsEnded).ToList();
         if (!session.Windows.WindowsAvailable)
         {
             Print("the window list needs ghostty-dalamud's GhosttyDalamud.v1.Call IPC");
@@ -396,6 +450,7 @@ public sealed class Plugin : IDalamudPlugin
         pluginInterface.UiBuilder.Draw -= DrawUi;
         pluginInterface.UiBuilder.OpenMainUi -= OpenMainUi;
         pluginInterface.UiBuilder.OpenConfigUi -= OpenConfigUi;
+        fileDialogs.Reset();
         windowSystem.RemoveAllWindows();
         XivDesktop.Shared.GameCursor.Release();
 

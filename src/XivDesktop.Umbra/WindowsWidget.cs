@@ -3,6 +3,7 @@
 // move-to-workspace. Clicking the workspace number opens the same menu for all panels and workspaces.
 // Talks to XivDesktop only through XivDesktop.v1.Windows / WindowAction / Workspace.
 using System.Reflection;
+using SkiaSharp;
 using Umbra.Common;
 using Umbra.Widgets;
 using Una.Drawing;
@@ -50,6 +51,10 @@ public sealed class WindowsWidget(
             stroke-color: "Widget.BorderHover";
         }
 
+        .xd-win.opened {
+            stroke-color: "Widget.TextHover";
+        }
+
         .xd-win.focused {
             stroke-color: "Widget.TextHover";
         }
@@ -83,6 +88,26 @@ public sealed class WindowsWidget(
     private readonly Node _strip = new() { ClassList = new ObservableHashSet<string> { "xd-strip" }, Stylesheet = StripStylesheet };
     private readonly Item[] _items = new Item[MaxItems];
     private XivDesktopClient? _client;
+    private readonly TaskbarArrivals _arrivals = new();
+    private static readonly TaskbarIconCache Icons = new(ReadIcon, ValidIcon);
+
+    private static byte[]? ReadIcon(string path)
+    {
+        using var file = File.OpenRead(path);
+        if (file.Length is <= 0 or > 1_048_576) return null;
+        var bytes = new byte[(int)file.Length];
+        file.ReadExactly(bytes);
+        return bytes;
+    }
+
+    private static bool ValidIcon(byte[] bytes)
+    {
+        using var stream = new SKMemoryStream(bytes);
+        using var codec = SKCodec.Create(stream);
+        if (codec == null || codec.Info.Width is <= 0 or > 1024 || codec.Info.Height is <= 0 or > 1024) return false;
+        using var bitmap = SKBitmap.Decode(bytes);
+        return bitmap != null;
+    }
 
     protected override StandardWidgetFeatures Features => StandardWidgetFeatures.Text;
 
@@ -152,6 +177,7 @@ public sealed class WindowsWidget(
         }
 
         SetText(w.Workspace.ToString());
+        _arrivals.Update(w.Windows.Select(p => (p.Id, p.State)), w.Veiled, Environment.TickCount64);
         Menu.Refresh(w);
         var all = GetConfigValue<bool>(CvarAllWorkspaces);
         var shown = w.Windows.Where(p => p.State != "ended" && (all || p.Workspace == 0 || p.Workspace == w.Workspace)).Take(MaxItems).ToList();
@@ -160,7 +186,7 @@ public sealed class WindowsWidget(
 
         var max = Math.Clamp(GetConfigValue<int>(CvarMaxTitle), 4, 64);
         for (var i = 0; i < shown.Count; i++)
-            _items[i].Show(shown[i], w.Workspace, max);
+            _items[i].Show(shown[i], w.Workspace, max, w.Veiled ? null : Icons.Get(shown[i].IconPath, Environment.TickCount64), _arrivals.Highlight(shown[i].Id, Environment.TickCount64));
         Hide(shown.Count);
     }
 
@@ -237,18 +263,23 @@ public sealed class WindowsWidget(
 
         public Node Root { get; }
 
-        public void Show(WindowPayload p, int currentWorkspace, int maxTitle)
+        public void Show(WindowPayload p, int currentWorkspace, int maxTitle, byte[]? icon, bool opened)
         {
             _panel = p;
             var name = p.Title.Length > 0 ? p.Title : p.App.Length > 0 ? p.App : $"window {p.Id}";
-            var label = name.Length > maxTitle ? name[..(maxTitle - 1)].TrimEnd() + "…" : name;
+            var title = name.Length > maxTitle ? name[..(maxTitle - 1)].TrimEnd() + "…" : name;
+            var workspace = p.Scratchpad ? "Bag" : p.Workspace > 0 ? "ws " + p.Workspace : "ws –";
+            var label = workspace + " · " + title;
             if (!Equals(_title.NodeValue, label)) _title.NodeValue = label;
-            var letter = LetterTile.Letter(name);
+            var letter = icon == null ? LetterTile.Letter(name) : "";
+            if (!ReferenceEquals(_icon.Style.ImageBytes, icon)) _icon.Style.ImageBytes = icon;
+            _icon.Style.ImageScaleMode = ImageScaleMode.Adapt;
             if (!Equals(_icon.NodeValue, letter)) _icon.NodeValue = letter;
             _icon.Style.BackgroundColor = new Color(LetterTile.Color(p.AppId ?? p.App));
             Root.Tooltip = $"{name}\n{p.Kind}{(p.State == "pending" ? " (opening)" : "")} · workspace {p.Workspace}"
                            + "\nClick: focus · Middle click: close · Right click: more";
             Root.ToggleClass("focused", p.Focused);
+            Root.ToggleClass("opened", opened);
             _title.ToggleClass("muted", p.Workspace != 0 && p.Workspace != currentWorkspace);
             Root.Style.IsVisible = true;
         }
@@ -288,6 +319,7 @@ public sealed class WindowsWidget(
 
         public void Refresh(WindowsPayload w, bool force = false)
         {
+            if (Target is { } previous) Target = w.Windows.FirstOrDefault(p => p.Id == previous.Id && p.State != "ended");
             var key = Target is { } t
                 ? $"t{t.Id}:{t.Kind}:{t.Workspace}:{t.Title}"
                 : $"a{w.Workspace}:" + string.Join(",", w.Windows.Where(p => p.State != "ended").Select(p => $"{p.Id}/{p.Workspace}/{p.Title}"));

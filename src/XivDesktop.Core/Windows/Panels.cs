@@ -25,6 +25,9 @@ public sealed record PanelInfo
     /// <summary>dropdown | tab | pet | pin | hud | min | full | hidden.</summary>
     public string View { get; init; } = "";
 
+    public string Pin { get; init; } = "";
+    public bool SupportsPlacementCapture { get; init; }
+
     public bool Focused { get; init; }
 
     public int? Order { get; init; }
@@ -107,6 +110,8 @@ public static class Panels
                     App = Str(p, "app"),
                     Profile = Str(p, "profile"),
                     View = Str(p, "view"),
+                    Pin = Str(p, "pin"),
+                    SupportsPlacementCapture = p.TryGetProperty("pin", out _),
                     Focused = p.TryGetProperty("focused", out var f) && f.ValueKind == JsonValueKind.True,
                     Order = Long(p, "order") is { } o ? (int)o : null,
                     Running = p.TryGetProperty("running", out var run) && run.ValueKind is JsonValueKind.True or JsonValueKind.False ? run.ValueKind == JsonValueKind.True : null,
@@ -131,10 +136,29 @@ public static class Panels
             Kind = "window",
             Title = w.Title,
             App = w.App,
+            Pin = w.Pin,
             View = w.Hidden == true ? "hidden" : w.Kind,
             Focused = w.Focused,
         }).ToList(),
     };
+
+    /// <summary>Merge native world panels without replacing the richer window metadata.</summary>
+    public static List<WindowPanel> WorkspaceWindows(WindowListSnapshot windows, PanelListSnapshot? panels)
+    {
+        var result = windows.Windows.ToDictionary(w => w.Id);
+        foreach (var p in panels?.Panels ?? [])
+        {
+            if (result.ContainsKey(p.Id) || p.View is not ("pet" or "pin" or "hud" or "hidden" or "full")) continue;
+            result[p.Id] = new WindowPanel
+            {
+                Id = p.Id, Title = p.Title, App = p.App.Length > 0 ? p.App : p.Kind == "terminal" ? "profile:" + p.Profile : "",
+                State = p.Running == false ? "ended" : "live", Focused = p.Focused,
+                Kind = p.View == "hidden" ? "pin" : p.View,
+                Hidden = p.IsHidden, Pin = p.Pin, SupportsPlacementCapture = p.SupportsPlacementCapture,
+            };
+        }
+        return result.Values.OrderBy(w => w.Id).ToList();
+    }
 
     private static long? Long(JsonElement o, string name)
         => o.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Number && v.TryGetInt64(out var n) ? n : null;

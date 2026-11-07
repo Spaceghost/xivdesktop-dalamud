@@ -22,6 +22,8 @@ public sealed class LauncherWindow : Window
     private readonly ITextureProvider textures;
     private readonly Configuration config;
 
+    public Action<string> OpenFileWith { get; set; } = _ => { };
+
     private string search = "";
     private string lastSearch = "\0";
     private AppCatalog? lastCatalog;
@@ -289,7 +291,7 @@ public sealed class LauncherWindow : Window
         ImGui.TextDisabled("run: " + app.Command);
         if (app.Terminal)
             ImGui.TextColored(ImGuiColors.DalamudOrange, "Terminal=true: not launched by XivDesktop v0.");
-        ImGui.TextDisabled("Right-click: favourite, copy command");
+        ImGui.TextDisabled("Right-click: launch actions, favourite, copy command or macro");
         ImGui.EndTooltip();
     }
 
@@ -299,10 +301,23 @@ public sealed class LauncherWindow : Window
             return;
         if (ImGui.MenuItem("Launch", "", false, CanLaunch(app, available)))
             Launch(app, available);
+        if (ImGui.MenuItem("Open file with…", "", false, available && app.Exec.Length > 0))
+            OpenFileWith(app.Id);
+        foreach (var action in app.Actions)
+        {
+            var target = LaunchPlan.ActionApp(app, action.Id)!;
+            if (ImGui.MenuItem(action.Name + "##action:" + action.Id, "", false, available && desktop.CanLaunch(target, out _)))
+            {
+                flash = desktop.LaunchAction(app.Id, action.Id);
+                flashUntil = DateTime.UtcNow.AddSeconds(4);
+            }
+        }
         if (ImGui.MenuItem(desktop.IsFavourite(app.Id) ? "Remove from favourites" : "Add to favourites"))
             desktop.ToggleFavourite(app.Id);
         if (ImGui.MenuItem("Copy command"))
             ImGui.SetClipboardText(app.Command);
+        if (ImGui.MenuItem("Copy game macro", "", false, !string.IsNullOrWhiteSpace(app.Id) && !app.Id.Any(char.IsControl)))
+            ImGui.SetClipboardText(LaunchPlan.MacroLine(app.Id));
         ImGui.EndPopup();
     }
 

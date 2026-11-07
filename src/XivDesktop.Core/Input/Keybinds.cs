@@ -3,6 +3,9 @@ namespace XivDesktop.Core.Input;
 /// <summary>The actions a key chord can run, and the sway-style default bindings.</summary>
 public static class KeyAction
 {
+    public const string Veil = "veil";
+    public const string ScratchpadStash = "scratchpad-stash";
+    public const string ScratchpadSummon = "scratchpad-summon";
     public const string Launcher = "launcher";
     public const string Terminal = "terminal";
     public const string Close = "close";
@@ -32,6 +35,9 @@ public static class KeyAction
             return move ? $"Move focused panel to workspace {n}" : $"Switch to workspace {n}";
         return action switch
         {
+            Veil => "Toggle the privacy veil",
+            ScratchpadStash => "Stash focused panel in the scratchpad",
+            ScratchpadSummon => "Summon the scratchpad",
             Launcher => "Open the launcher",
             Terminal => "Open a terminal",
             Close => "Close the focused window panel",
@@ -48,7 +54,7 @@ public static class KeyAction
 
     private static List<string> BuildAll()
     {
-        var all = new List<string> { Launcher, Terminal, Close, TogglePet, PinFront, FocusPrev, FocusNext };
+        var all = new List<string> { Launcher, Terminal, Close, TogglePet, PinFront, FocusPrev, FocusNext, ScratchpadStash, ScratchpadSummon, Veil };
         for (var i = 1; i <= Workspaces.WorkspaceModel.Count; i++)
             all.Add(Workspace(i));
         for (var i = 1; i <= Workspaces.WorkspaceModel.Count; i++)
@@ -91,6 +97,9 @@ public static class Keybinds
 
         var d = new Dictionary<string, string>
         {
+            [KeyAction.Veil] = C(mod, 'V'),
+            [KeyAction.ScratchpadStash] = C(mod | extra, 0xBD),
+            [KeyAction.ScratchpadSummon] = C(mod, 0xBD),
             [KeyAction.Launcher] = C(mod, 'D'),
             [KeyAction.Terminal] = C(mod, 0x0D),
             [KeyAction.Close] = C(mod, 'Q'),

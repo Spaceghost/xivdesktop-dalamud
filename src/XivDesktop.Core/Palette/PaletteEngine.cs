@@ -1,6 +1,7 @@
 using XivDesktop.Core.Input;
 using XivDesktop.Core.Windows;
 using XivDesktop.Core.Workspaces;
+using XivDesktop.Core.Layouts;
 
 namespace XivDesktop.Core.Palette;
 
@@ -46,6 +47,11 @@ public sealed record PaletteQuery(PaletteFilter Filter, string Text)
 /// <summary>What running a palette row does. The plugin maps each kind onto its services.</summary>
 public sealed record PaletteCommand(string Kind, string Arg = "", long Id = 0, int Number = 0)
 {
+    public const string Plate = "plate";
+    public const string OpenFile = "open-file"; // Arg: desktop-file id; opens the file picker
+    public const string LaunchAction = "launch-action"; // Arg: desktop-file id, Text: action id
+    public string Text { get; init; } = "";
+
     public const string Launch = "launch";     // Arg: desktop-file id
     public const string Focus = "focus";       // Id: panel
     public const string Close = "close";       // Id: panel
@@ -110,6 +116,8 @@ public sealed record PaletteItem
     /// <summary>For app rows: the desktop-file id (the plugin draws its icon).</summary>
     public string? AppId { get; init; }
 
+    public IReadOnlyList<DesktopAction> AppActions { get; init; } = [];
+
     /// <summary>For window rows: the panel id.</summary>
     public long? WindowId { get; init; }
 
@@ -140,6 +148,7 @@ public sealed record PaletteContext
     public Func<long, int> WorkspaceOf { get; init; } = _ => 0;
 
     public int CurrentWorkspace { get; init; } = 1;
+    public IReadOnlyList<DeskPlate> Plates { get; init; } = [];
 
     /// <summary>Launching and window changes are possible (ghostty-dalamud present).</summary>
     public bool GhosttyAvailable { get; init; } = true;
@@ -281,6 +290,7 @@ public static class PaletteEngine
                 Highlights = hl,
                 Command = new PaletteCommand(PaletteCommand.Launch, app.Id),
                 AppId = app.Id,
+                AppActions = app.Actions,
                 Enabled = launchable,
                 Reason = launchable ? null : !ctx.GhosttyAvailable ? "needs ghostty-dalamud" : app.Terminal ? "terminal app: needs ghostty-dalamud's terminal.new" : "cannot be started here",
             });
@@ -398,7 +408,7 @@ public static class PaletteEngine
     /// <summary>
     /// The keyboard actions of a row. Panel and window rows: Enter focuses, Ctrl+P pet/pin, Ctrl+H dock to
     /// the HUD, Ctrl+M minimize, Ctrl+W close, Alt+Left/Right move in the order, Alt+Home/End first/last.
-    /// Other rows have only their Enter action.
+    /// App rows also offer Copy macro and the listed desktop actions.
     /// </summary>
     public static List<RowAction> RowActions(PaletteItem item)
     {
@@ -409,6 +419,18 @@ public static class PaletteEngine
             PaletteProvider.Calc => "Copy",
             _ => "Run",
         }, KeyChord.None, item.Command);
+        if (item.Provider == PaletteProvider.App && item.AppId is { } appId)
+        {
+            var actions = new List<RowAction> { primary };
+            if (!string.IsNullOrWhiteSpace(appId) && !appId.Any(char.IsControl))
+                actions.Add(new RowAction("Copy macro", KeyChord.Parse("Ctrl+Shift+C"),
+                    new PaletteCommand(PaletteCommand.Copy, LaunchPlan.MacroLine(appId))));
+            actions.Add(new RowAction("Open file with…", KeyChord.Parse("Ctrl+O"),
+                new PaletteCommand(PaletteCommand.OpenFile, appId)));
+            actions.AddRange(item.AppActions.Select(a => new RowAction(a.Name, KeyChord.None,
+                new PaletteCommand(PaletteCommand.LaunchAction, appId) { Text = a.Id })));
+            return actions;
+        }
         if (item.Provider is not (PaletteProvider.Panel or PaletteProvider.Window) || item.WindowId is not { } id)
             return [primary];
         return
@@ -456,6 +478,24 @@ public static class PaletteEngine
 
     private static void Commands(List<PaletteItem> items, PaletteContext ctx, string text, bool forced)
     {
+        foreach (var plate in ctx.Plates)
+        {
+            var title = "plate " + plate.Name;
+            var match = Fuzzy.Match(title, text);
+            if (text.Length > 0 && match == null) continue;
+            if (text.Length == 0 && !forced) continue;
+            items.Add(new PaletteItem
+            {
+                Provider = PaletteProvider.Command,
+                Title = title,
+                Subtitle = string.Join(" · ", plate.Pieces.OrderBy(p => p.Order).Select(p =>
+                    $"{ctx.Apps.FirstOrDefault(a => a.Id == p.AppId)?.Name ?? p.AppId}: workspace {p.Workspace}, {p.Pin}")),
+                Score = text.Length == 0 ? 120 : 700,
+                Command = new PaletteCommand(PaletteCommand.Plate, plate.Name),
+                Enabled = ctx.WindowsAvailable,
+                Reason = ctx.WindowsAvailable ? null : "needs ghostty-dalamud's window IPC",
+            });
+        }
         // "/anything": run it as a chat command (Dalamud-registered commands only).
         if (text.StartsWith('/') && text.Length > 1)
         {

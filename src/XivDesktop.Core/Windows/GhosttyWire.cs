@@ -34,6 +34,10 @@ public sealed record WindowPanel
     /// <summary>The world anchor (pet, pin, me, target, orbit, none); "" from an older ghostty-dalamud.</summary>
     public string Anchor { get; init; } = "";
 
+    /// <summary>Canonical placement arguments from newer Ghostty builds, relative to the player.</summary>
+    public string Pin { get; init; } = "";
+    public bool SupportsPlacementCapture { get; init; }
+
     /// <summary>Hidden by window.hide; null when ghostty-dalamud does not report it (older builds).</summary>
     public bool? Hidden { get; init; }
 
@@ -66,6 +70,7 @@ public sealed record WindowRequestResult
 
     /// <summary>For window.open: the new panel id, when it was created.</summary>
     public long? PanelId { get; init; }
+    public long? ClipboardRequest { get; init; }
 }
 
 /// <summary>A parsed <c>window.list</c> result.</summary>
@@ -168,9 +173,80 @@ public static class GhosttyWire
 
     public static string FocusCycle(int dir) => Request("focus.cycle", new JsonObject { ["dir"] = dir < 0 ? "prev" : "next" });
 
+    public static string ClipboardRead() => Request("agent.clipboard.read");
+    public static string ClipboardResult() => Request("agent.clipboard");
+    public static string NotificationsRead() => Request("agent.notifications");
+
+    public static Notifications.AppNotificationSnapshot? ParseNotifications(string? json)
+    {
+        var reply = ParseReply(json);
+        if (!reply.Ok || reply.Result.ValueKind != JsonValueKind.Object) return null;
+        var root = reply.Result;
+        if (Long(root, "rev") is not { } revision || revision < 0 ||
+            !root.TryGetProperty("events", out var items) || items.ValueKind != JsonValueKind.Array || items.GetArrayLength() > 64)
+            return null;
+        var events = new List<Notifications.AgentNotification>();
+        long last = 0;
+        static string? Text(JsonElement item, string name, int bytes)
+        {
+            if (!item.TryGetProperty(name, out var value) || value.ValueKind != JsonValueKind.String) return null;
+            var text = value.GetString()!;
+            try { return !text.Contains('\0') && new System.Text.UTF8Encoding(false, true).GetByteCount(text) <= bytes ? text : null; }
+            catch (System.Text.EncoderFallbackException) { return null; }
+        }
+        foreach (var item in items.EnumerateArray())
+        {
+            if (item.ValueKind != JsonValueKind.Object || Long(item, "seq") is not { } sequence || sequence <= last || sequence > revision ||
+                Long(item, "nonce") is not { } nonce || nonce < 0 || Long(item, "id") is not { } id || id is <= 0 or > uint.MaxValue ||
+                Text(item, "source", 128) is not { Length: > 0 } source || Text(item, "kind", 16) is not { } kind ||
+                kind is not ("notification" or "closed")) return null;
+            string app = "", desktop = "", summary = "", body = "";
+            long urgency = 1;
+            if (kind == "notification")
+            {
+                if (Text(item, "app", 256) is not { } a || Text(item, "desktop_entry", 256) is not { } d ||
+                    Text(item, "summary", 512) is not { } s || Text(item, "body", 4096) is not { } b ||
+                    Long(item, "urgency") is not { } u || u is < 0 or > 2) return null;
+                (app, desktop, summary, body, urgency) = (a, d, s, b, u);
+            }
+            events.Add(new(sequence, source, nonce, (uint)id, kind, app, desktop, summary, body, (byte)urgency));
+            last = sequence;
+        }
+        return new(revision, events);
+    }
+
+    public static string ClipboardWrite(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        if (text.Contains('\0') || new System.Text.UTF8Encoding(false, true).GetByteCount(text) > Clipboard.ClipboardBridge.MaxBytes)
+            throw new ArgumentException("Clipboard text must be UTF-8 without NUL and at most 65536 bytes.", nameof(text));
+        return Request("agent.clipboard.write", new JsonObject { ["text"] = text });
+    }
+
+    public static Clipboard.ClipboardResult? ParseClipboard(string? json)
+    {
+        var reply = ParseReply(json);
+        if (!reply.Ok || reply.Result.ValueKind != JsonValueKind.Object) return null;
+        var r = reply.Result;
+        var request = Long(r, "request");
+        var operation = Str(r, "operation");
+        if (request is not > 0 || operation is not ("read" or "write")
+            || !r.TryGetProperty("pending", out var pending) || pending.ValueKind is not (JsonValueKind.True or JsonValueKind.False)
+            || !r.TryGetProperty("available", out var available) || available.ValueKind is not (JsonValueKind.True or JsonValueKind.False)
+            || !r.TryGetProperty("text", out var textValue) || textValue.ValueKind != JsonValueKind.String) return null;
+        var text = textValue.GetString() ?? "";
+        try { ClipboardWrite(text); }
+        catch (ArgumentException) { return null; }
+        var known = r.TryGetProperty("sensitivity_known", out var k) && k.ValueKind == JsonValueKind.True;
+        var sensitive = !r.TryGetProperty("sensitive", out var secret) || secret.ValueKind != JsonValueKind.False;
+        return new(request.Value, operation, pending.ValueKind == JsonValueKind.True,
+            available.ValueKind == JsonValueKind.True, text, known, sensitive);
+    }
+
     public static string AgentApps() => Request("agent.apps");
 
-    public static string AgentWindowsRefresh() => Request("agent.windows.refresh");
+    public static string AgentWindowsRefresh(int? iconSize = null) => iconSize == null ? Request("agent.windows.refresh")
+        : Request("agent.windows.refresh", new JsonObject { ["icon_size"] = Math.Clamp(iconSize.Value, 16, 512) });
 
     /// <summary>The window.open match text that makes the agent start the app with desktop id <paramref name="id"/>.</summary>
     public static string AppMatch(string id) => "app:" + id;
@@ -272,6 +348,8 @@ public static class GhosttyWire
                     Kind = Str(w, "kind"),
                     Focused = w.TryGetProperty("focused", out var f) && f.ValueKind == JsonValueKind.True,
                     Anchor = Str(w, "anchor"),
+                    Pin = Str(w, "pin"),
+                    SupportsPlacementCapture = w.TryGetProperty("pin", out _),
                     Hidden = w.TryGetProperty("hidden", out var hd) && hd.ValueKind is JsonValueKind.True or JsonValueKind.False ? hd.ValueKind == JsonValueKind.True : null,
                     Agent = Str(w, "agent"),
                     Key = Str(w, "key"),
@@ -287,8 +365,12 @@ public static class GhosttyWire
                 if (q.ValueKind != JsonValueKind.Object || Long(q, "request") is not { } rid)
                     continue;
                 long? panel = null;
+                long? clipboard = null;
                 if (q.TryGetProperty("result", out var res) && res.ValueKind == JsonValueKind.Object)
+                {
                     panel = Long(res, "id");
+                    clipboard = Long(res, "request");
+                }
                 requests.Add(new WindowRequestResult
                 {
                     Request = rid,
@@ -296,11 +378,41 @@ public static class GhosttyWire
                     Ok = q.TryGetProperty("ok", out var ok) && ok.ValueKind == JsonValueKind.True,
                     Error = q.TryGetProperty("error", out var e) && e.ValueKind == JsonValueKind.String ? e.GetString() : null,
                     PanelId = panel,
+                    ClipboardRequest = clipboard,
                 });
             }
         }
 
         return new WindowListSnapshot { Rev = Long(r, "rev") ?? 0, Windows = windows, Requests = requests };
+    }
+
+    public static string AgentIconsRender(SvgIconRequest request)
+    {
+        if (request.Size is < 16 or > 512) throw new ArgumentOutOfRangeException(nameof(request));
+        if (request.Icons.Count is < 1 or > SvgIconRequests.BatchSize || request.Icons.Any(icon => !SvgIconRequests.ValidName(icon)))
+            throw new ArgumentException("Expected 1..64 valid icon names", nameof(request));
+        var icons = new JsonArray();
+        foreach (var icon in request.Icons) icons.Add(icon);
+        return Request("agent.icons.render", new JsonObject { ["size"] = request.Size, ["icons"] = icons });
+    }
+
+    public static string AgentIcons() => Request("agent.icons");
+
+    public static IReadOnlyList<SvgIconReply> ParseAgentIcons(string? json)
+    {
+        var reply = ParseReply(json);
+        if (!reply.Ok || reply.Result.ValueKind != JsonValueKind.Array) return [];
+        var icons = new List<SvgIconReply>();
+        foreach (var item in reply.Result.EnumerateArray())
+        {
+            if (icons.Count >= 512) break;
+            if (item.ValueKind != JsonValueKind.Object || Long(item, "size") is not (>= 16 and <= 512)) continue;
+            var name = Str(item, "icon");
+            var png = Str(item, "png");
+            if (SvgIconRequests.ValidName(name) && png.StartsWith('/') && png.EndsWith(".png", StringComparison.OrdinalIgnoreCase) && !png.Any(char.IsControl))
+                icons.Add(new SvgIconReply(name, (int)Long(item, "size")!.Value, png));
+        }
+        return icons;
     }
 
     public static AgentStatus? ParseAgentStatus(string? json)

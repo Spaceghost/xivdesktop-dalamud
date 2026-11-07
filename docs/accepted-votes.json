@@ -1,0 +1,301 @@
+{
+  "mod": "xivdesktop",
+  "catalogue_version": 1,
+  "accepted_count": 18,
+  "note": "All 18 Want features remain in scope. Host-tested means source changes and host tests exist, not merged, released, or certified in game.",
+  "features": [
+    {
+      "id": "desk-doctor",
+      "title": "/desktop doctor",
+      "status": "host-tested",
+      "evidence": [
+        "tests/XivDesktop.Core.Tests/DesktopDoctorTests.cs"
+      ],
+      "in_game_verified": false,
+      "released": false
+    },
+    {
+      "id": "desk-open-with-file",
+      "title": "Open With, from inside the game",
+      "status": "host-tested",
+      "evidence": [
+        "tests/XivDesktop.Core.Tests/OpenWithTests.cs"
+      ],
+      "in_game_verified": false,
+      "released": false
+    },
+    {
+      "id": "desk-desktop-actions",
+      "title": "Right-Click Actions from the .desktop File",
+      "status": "host-tested",
+      "evidence": [
+        "tests/XivDesktop.Core.Tests/DesktopActionTests.cs"
+      ],
+      "in_game_verified": false,
+      "released": false
+    },
+    {
+      "id": "desk-svg-icons",
+      "title": "Real Icons, Not Letter Tiles",
+      "status": "in-progress",
+      "evidence": [
+        "/var/home/jack/xivterm/ghostty-dalamud/tests/test_desktop_entries.nelua",
+        "/var/home/jack/xivterm/ghostty-dalamud/agent/desktop_entries.nelua",
+        "tests/XivDesktop.Core.Tests/TaskbarIconTests.cs",
+        "/var/home/jack/xivterm/ghostty-dalamud/tests/test_ipc.lua",
+        "/var/home/jack/xivterm/ghostty-dalamud/tools/check-wayland-source.sh",
+        "tests/XivDesktop.Core.Tests/SvgIconRequestTests.cs",
+        "/var/home/jack/xivterm/ghostty-dalamud/tests/test_ipc.nelua",
+        "src/XivDesktop.Plugin/Services/CatalogService.cs",
+        "src/XivDesktop.Plugin/Services/GhosttyCallBackend.cs"
+      ],
+      "in_game_verified": false,
+      "released": false,
+      "remaining": [
+        "Compile and verify compositor integration with matching Wayland libraries",
+        "In-game icon rendering verification"
+      ],
+      "verification_note": "Wayland-enabled Nelua analysis and C generation pass, including standalone icon callback registration and dispatch. Native IPC verifies exact request forwarding; Core tests verify bounded request serialization. Native C compilation/linking and compositor runtime are still unverified. Catalog now requests SVG-only entries, polls replies, and applies only existing PNGs off the framework thread; immutable catalog application is host-tested and the plugin builds. In-game behavior remains unverified."
+    },
+    {
+      "id": "desk-record-chord",
+      "title": "Press the Chord to Bind It",
+      "status": "host-tested",
+      "evidence": [
+        "tests/XivDesktop.Core.Tests/ChordCaptureTests.cs"
+      ],
+      "in_game_verified": false,
+      "released": false
+    },
+    {
+      "id": "desk-macro-lines",
+      "title": "Apps on Your Hotbar, by Macro",
+      "status": "host-tested",
+      "evidence": [
+        "tests/XivDesktop.Core.Tests/DesktopActionTests.cs"
+      ],
+      "in_game_verified": false,
+      "released": false
+    },
+    {
+      "id": "desk-controller-ring",
+      "title": "Controller Ring Launcher",
+      "status": "in-progress",
+      "evidence": [
+        "src/XivDesktop.Core/ControllerRing.cs",
+        "tests/XivDesktop.Core.Tests/ControllerRingTests.cs",
+        "src/XivDesktop.Plugin/Windows/ControllerRingWindow.cs",
+        "src/XivDesktop.Plugin/Windows/SettingsWindow.cs"
+      ],
+      "in_game_verified": false,
+      "released": false,
+      "remaining": [
+        "In-game stick orientation/deadzone, hold chord, radial UI, workspace and launch verification",
+        "In-game focus, duty and privacy cancellation verification"
+      ],
+      "verification_note": "Host tests cover ring input rules. Plugin builds with IGamepadState framework input, configurable hold chord and raw-stick deadzone, radial favourite icons, release launch, and shoulder workspace steps. Input is cancelled during duty stow, veil, foreground loss and ImGui gamepad navigation. Source and build evidence do not verify controller behavior in game."
+    },
+    {
+      "id": "desk-glamour-plate-layouts",
+      "title": "Glamour Plates for Your Desk",
+      "status": "host-tested",
+      "evidence": [
+        "tests/XivDesktop.Core.Tests/DeskPlateTests.cs",
+        "src/XivDesktop.Plugin/Services/SessionPlates.cs",
+        "/var/home/jack/xivterm/ghostty-dalamud/tests/test_plate_placement.lua",
+        "tests/XivDesktop.Core.Tests/TerminalPlateTests.cs"
+      ],
+      "in_game_verified": false,
+      "released": false,
+      "remaining": [
+        "In-game launch, placement, ordering and workspace restoration verification"
+      ]
+    },
+    {
+      "id": "desk-zone-layouts",
+      "title": "The Desk Knows Where You Are",
+      "status": "host-tested",
+      "evidence": [
+        "tests/XivDesktop.Core.Tests/ZoneLayoutTests.cs",
+        "src/XivDesktop.Plugin/Services/DesktopContextService.cs"
+      ],
+      "in_game_verified": false,
+      "released": false,
+      "remaining": [
+        "In-game territory, loading and duty transition verification"
+      ],
+      "limitations": [
+        "Territory IDs only: wards, plots and instances sharing an ID share a rule because the client-state API does not expose ward/plot identity"
+      ]
+    },
+    {
+      "id": "desk-gearset-workspaces",
+      "title": "Change Job, Change Desk",
+      "status": "host-tested",
+      "evidence": [
+        "tests/XivDesktop.Core.Tests/DesktopContextTests.cs"
+      ],
+      "in_game_verified": false,
+      "released": false
+    },
+    {
+      "id": "desk-scratchpad",
+      "title": "The Chocobo Saddlebag Scratchpad",
+      "status": "host-tested",
+      "evidence": [
+        "tests/XivDesktop.Core.Tests/DesktopContextTests.cs"
+      ],
+      "in_game_verified": false,
+      "released": false
+    },
+    {
+      "id": "desk-taskbar-icons",
+      "title": "Proper Icons on the Umbra Taskbar",
+      "status": "host-tested",
+      "evidence": [
+        "tests/XivDesktop.Core.Tests/TaskbarIconTests.cs",
+        "src/XivDesktop.Umbra/WindowsWidget.cs"
+      ],
+      "in_game_verified": false,
+      "released": false,
+      "remaining": [
+        "In-game Umbra icon, taskbar and privacy-menu verification",
+        "SVG-only coverage depends on desk-svg-icons"
+      ]
+    },
+    {
+      "id": "desk-clipboard-bridge",
+      "title": "One Clipboard for Both Worlds",
+      "status": "in-progress",
+      "evidence": [
+        "src/XivDesktop.Core/Clipboard/ClipboardBridge.cs",
+        "tests/XivDesktop.Core.Tests/ClipboardBridgeTests.cs",
+        "src/XivDesktop.Core/Clipboard/ClipboardResult.cs",
+        "src/XivDesktop.Core/Windows/GhosttyWire.cs",
+        "src/XivDesktop.Plugin/Services/GhosttyCallBackend.cs",
+        "tests/XivDesktop.Core.Tests/ClipboardWireTests.cs",
+        "src/XivDesktop.Plugin/Services/ClipboardBridgeService.cs",
+        "src/XivDesktop.Plugin/Services/GameClipboard.cs",
+        "src/XivDesktop.Core/Clipboard/ClipboardSampling.cs",
+        "tests/XivDesktop.Core.Tests/ClipboardSamplingTests.cs",
+        "/var/home/jack/xivterm/ghostty-dalamud/agent/sys_windows.nelua",
+        "/var/home/jack/xivterm/ghostty-dalamud/core/agent_client.nelua",
+        "src/XivDesktop.Core/Clipboard/ClipboardSync.cs",
+        "tests/XivDesktop.Core.Tests/ClipboardSyncTests.cs",
+        "/var/home/jack/xivterm/ghostty-dalamud/tools/clipboard_snapshot.c",
+        "/var/home/jack/xivterm/ghostty-dalamud/tests/test_clipboard_helper.nelua",
+        "/var/home/jack/xivterm/ghostty-dalamud/tools/test-clipboard-container.sh",
+        "/var/home/jack/xivterm/ghostty-dalamud/tools/test-clipboard-agent.py",
+        "/var/home/jack/xivterm/ghostty-dalamud/tests/fixtures/clipboard_source.c"
+      ],
+      "in_game_verified": false,
+      "released": false,
+      "remaining": [
+        "GNOME/X11 support and full release-configuration verification",
+        "Windows/Wine and in-game integration verification",
+        "Reconnect and stale host-write verification"
+      ],
+      "verification_note": "464 Core tests pass, including production polling workflow with mocked transport for both directions, echo suppression, unknown/sensitive replies, pause/resume, denied writes and recovery after a clipboard read exception. Native wlroots 0.20.2 compositor integration passes in an isolated Fedora container: rendering/input, both clipboard directions, current safe-source metadata, source-close and shutdown invalidation. Actual external host/Windows/Wine clipboard and IPC/game behavior remain unverified. Plugin build passes with two existing AskBackend warnings. Agent disconnection disables and resets synchronization. Real GTK safe/concealed offers pass: safe text is requested and forwarded; concealed text is never requested or forwarded. Closing a focused window clears stale keyboard/text-input focus, fixing a sanitizer-detected use-after-free. Expanded normal compositor suite exits 0; sanitized functional assertions pass but shutdown leaks remain. Real GTK empty/65537-byte offers also pass: valid empty text clears the host clipboard; oversized text stays unavailable without forwarding. External ext-data-control helper compiles and passes headless Sway safe/empty/oversized/concealed-source tests. Eight native agent helper-transport cases pass. Full Linux agent builds with one existing lwIP warning. Authenticated runtime, unsupported-compositor paths and package verification remain pending. Authenticated non-compositor Linux agent/helper integration passes actual Sway safe/empty/sensitive/oversized reads and synthetic game-to-host write/readback; unauthenticated reads are refused. A native slow source replaced during transfer is discarded with no output. Internal-backend provider routing and Desktop stale-host-write race remain unverified. Full native Wayland-enabled agent integration now passes external host metadata/write tests and internal GTK safe/concealed routing with different external text; closing an internal source restores external metadata. Source tarball includes the helper and build script; RPM build is in progress. Fedora 44 Wayland RPM builds/checks pass with netlab omitted. Installed-path testing caught and fixed default helper path ownership; regenerated installed RPM passes all external/internal routing and write/readback tests without a helper override. Package artifact is local and unreleased; full release configuration and game behavior remain unverified."
+    },
+    {
+      "id": "desk-app-notifications",
+      "title": "Moogle Delivery for App Notifications",
+      "status": "in-progress",
+      "evidence": [
+        "/var/home/jack/xivterm/ghostty-dalamud/tools/app_notifications.py",
+        "/var/home/jack/xivterm/ghostty-dalamud/tests/test_app_notifications.py",
+        "/var/home/jack/xivterm/ghostty-dalamud/agent/notification_process.nelua",
+        "/var/home/jack/xivterm/ghostty-dalamud/agent/capture_wayland.nelua",
+        "/var/home/jack/xivterm/ghostty-dalamud/tools/test-notification-agent.py",
+        "/var/home/jack/xivterm/ghostty-dalamud/core/notification_cache.nelua",
+        "src/XivDesktop.Core/Notifications/AgentNotification.cs",
+        "tests/XivDesktop.Core.Tests/NotificationTests.cs",
+        "/var/home/jack/xivmods/xivdesktop-dalamud/src/XivDesktop.Core/Notifications/NotificationPresentation.cs",
+        "/var/home/jack/xivmods/xivdesktop-dalamud/src/XivDesktop.Plugin/Services/AppNotificationService.cs",
+        "/var/home/jack/xivmods/xivdesktop-dalamud/tests/XivDesktop.Core.Tests/NotificationTests.cs",
+        "/var/home/jack/xivmods/xivdesktop-dalamud/src/XivDesktop.Core/Notifications/AppNotificationController.cs",
+        "/var/home/jack/xivmods/xivdesktop-dalamud/src/XivDesktop.Core/Notifications/NotificationTargets.cs",
+        "/var/home/jack/xivmods/xivdesktop-dalamud/tests/XivDesktop.Core.Tests/AppNotificationControllerTests.cs",
+        "/var/home/jack/xivterm/ghostty-dalamud/tests/test_notification_process.nelua",
+        "/var/home/jack/xivterm/ghostty-dalamud/build/notification-rpm-check.log",
+        "/var/home/jack/xivterm/ghostty-dalamud/build/notification-installed-agent-test.log",
+        "/var/home/jack/xivterm/ghostty-dalamud/build/notification-installed-process-test.log"
+      ],
+      "in_game_verified": false,
+      "released": false,
+      "remaining": [
+        "Full release configuration/package verification (netlab-enabled build remains unverified)",
+        "Actual native-host IPC and in-game toast/icon/focus verification"
+      ],
+      "verification_note": "Three isolated private-bus tests pass. Full native compositor test launches an app with the private bus and receives its synthetic notification. Native authenticated agent forwards a 20-message burst to a subscribed window watcher and not an authenticated non-watcher. Normal helper lifecycle and bounded framing work; no Ghostty IPC cache or Dalamud app toast delivery is implemented yet. Packaging rules include helper/dependencies but the updated package is unverified. Native bounded cache tests and Lua IPC validation tests pass. Typed Desktop snapshot/inbox implementation passes wire and replay tests (467 total Core tests); backend read adapter exists, but toast consumption is not wired up. Native host source analysis/C generation passes; actual game IPC remains unverified. Desktop toast consumption is now wired on framework updates at 500 ms, with opt-in enablement, title-only default, privacy/private-app/duty suppression, immediate scrubbing before dismissal, four-toasts-per-ten-seconds burst limit, catalog icons and route-matched click-to-focus through SessionService. Focus matching excludes editable window-title guesses. 469 Core tests pass, including title-only/privacy/rate behavior and notification app matching. Plugin Release build passes with two existing AskBackend warnings. Lifecycle and real game delivery remain unverified. Production lifecycle is now extracted into AppNotificationController and exercised by eight sink-backed tests covering replacements/close, replacement burst coalescing, immediate privacy/title-only changes, old callbacks, route and nonce isolation, disconnect/revision baselines, disabling between polls, rate-limited closes, timeout, failed sink recovery and disposal. Exact route/app/live-panel selection has its own test. Full Core suite: 478 passing tests; plugin Release build passes with the same two existing warnings. A final strengthened retained-old-nonce fixture also passes the eight lifecycle tests. Dalamud rendering and game behavior are still unverified. Updated Fedora 44 source/RPM build and checks pass with Wayland enabled and netlab omitted. The isolated-container installed RPM passes a 20-message authenticated watcher test through its default helper path, with no non-watcher delivery and a private app bus distinct from the parent address. A real native NotificationProcess fixture passes normal and forcibly crashed helper cleanup against both source and installed helpers; private bus processes terminate in both cases. Package artifacts are local/unreleased. Full release configuration and native-host/game delivery remain unverified."
+    },
+    {
+      "id": "desk-xivmcp-tools",
+      "title": "Let XivMcp Drive the Desk",
+      "status": "host-tested",
+      "evidence": [
+        "/var/home/jack/xivmods/xivmcp-dalamud/src/XivMcp.Plugin/Providers/Bridges/DesktopAppsBridgeProvider.cs",
+        "/var/home/jack/xivmods/xivmcp-dalamud/src/XivMcp.Plugin/Bridges/DesktopBridge.cs",
+        "/var/home/jack/xivmods/xivmcp-dalamud/tests/XivMcp.Plugin.Tests/BridgeFamilyTests.cs",
+        "/var/home/jack/xivmods/xivmcp-dalamud/tests/XivMcp.Plugin.Tests/DesktopLaunchObservationTests.cs"
+      ],
+      "in_game_verified": false,
+      "released": false,
+      "remaining": [
+        "In-game MCP approval, launch observation, window actions and workspace verification"
+      ],
+      "limitations": [
+        "XivDesktop v1 returns text rather than a correlated launch request id. New live matching panels can be observed, but concurrent same-app launches cannot be distinguished."
+      ],
+      "verification_note": "All six typed tools already existed; Action permission and launch approval remain. Launch now polls via game-thread marshaling for up to two seconds and separately reports observation rather than claiming the handoff opened a panel. Host tests exercise existing, pending, unrelated, ambiguous and cancelled observations."
+    },
+    {
+      "id": "desk-send-to-game",
+      "title": "Send This Window to Eorzea",
+      "status": "in-progress",
+      "evidence": [
+        "/var/home/jack/xivterm/ghostty-dalamud/tools/portal_capture.py",
+        "/var/home/jack/xivterm/ghostty-dalamud/tests/test_portal_capture.py",
+        "/var/home/jack/xivterm/ghostty-dalamud/agent/portal_frames.nelua",
+        "/var/home/jack/xivterm/ghostty-dalamud/tests/test_portal_frames.nelua",
+        "/var/home/jack/xivterm/ghostty-dalamud/agent/portal_process.nelua",
+        "/var/home/jack/xivterm/ghostty-dalamud/tests/test_portal_process.nelua",
+        "/var/home/jack/xivterm/ghostty-dalamud/agent/capture_portal.nelua",
+        "/var/home/jack/xivterm/ghostty-dalamud/tests/test_capture_portal.nelua",
+        "/var/home/jack/xivterm/ghostty-dalamud/tests/test_agent_portal.nelua",
+        "/var/home/jack/xivterm/ghostty-dalamud/tools/test-portal-agent.py",
+        "/var/home/jack/xivterm/ghostty-dalamud/tests/test_portal_input.nelua",
+        "/var/home/jack/xivterm/ghostty-dalamud/packaging/ghostty-agent.spec",
+        "/var/home/jack/xivterm/ghostty-dalamud/tools/package-agent.sh"
+      ],
+      "in_game_verified": false,
+      "released": false,
+      "remaining": [
+        "Implement authorized input forwarding and GNOME Shell window-menu entry",
+        "Host-to-game capture handoff and palette/taskbar support",
+        "Real portal consent, same-window identity, input and in-game verification"
+      ],
+      "verification_note": "A host prototype implements CreateSession, single-window SelectSources, Start and OpenPipeWireRemote with bounded waits and FD/session cleanup. Three fake-transport host tests pass. It is not registered as an agent backend and has not negotiated a real portal stream. Session Closed signals now revoke capture and release local resources; five tests pass, including revocation while the remote FD is being acquired. A nonblocking GStreamer reader now converts portal stream buffers to bounded packed BGRA frames, uses portal serial targeting when available, and handles stream errors and revocation. Eight host tests pass, including real synthetic GStreamer frame mapping. Real desktop portal capture remains unverified. The helper now has an inherited-Unix-socket frame writer with a two-second backpressure timeout and PGF1 bounded BGRA framing. Twelve tests pass, including real socket transport, fragmented/truncated input and invalid-header rejection. The native agent reader is not yet implemented. Native PGF1 decoding now compiles and passes host tests for fragmented reads, dimensions/length validation, monotonic serials and EOF. It is not yet wired to socket reads or capture handles. A Linux native process wrapper now spawns a Python helper on an inherited Unix socket, polls frames nonblockingly, and owns child/socket/decoder cleanup. A compiled host test exercises a real fixture child emitting two frames and exiting. Real portal backend registration remains unfinished. Linux --windows portal now registers the capture backend, pumps helper frames and exposes pending/live/ended handles. Its compiled fixture test passes through the capture interface. It is picker-based and view-only: exact Shell window identity, input forwarding and in-game rendering remain unfinished. A real loopback-agent integration test now passes WOPEN/WOPENED, WFRAME decoding with exact RGB verification, and WEND after fixture EOF. This proves synthetic capture traverses the network encoding path, not real portal or in-game capture. Remote Desktop permission negotiation is now available in the host transport, with combined ScreenCast sources and granted-device tracking. Fifteen helper tests pass, including Gio interface/variant routing and denial of input grants for ScreenCast-only sessions. It is not enabled by the agent; events are still not forwarded. Host pointer dispatch now checks POINTER grants, scales captured pixels to logical coordinates, maps Evdev mouse buttons and accumulates discrete wheel steps. Sixteen helper tests pass. Agent-to-helper input transport and real portal input remain unfinished. The helper now decodes bounded PGI1 input from its private socket and dispatches pointer events after frame dimensions are known when --input requests Remote Desktop consent. Eighteen tests pass, including socket input and frame-loop dispatch. Native event writing/opt-in and keyboard/text forwarding remain unfinished. Native CaptureInput now serializes PGI1 into a bounded nonblocking socket writer; GHOSTTY_PORTAL_INPUT=1 passes --input to request portal consent. A compiled real-child fixture test verifies exact button event bytes. Keyboard/text forwarding and real portal behavior remain unfinished. Permission-checked keyboard/text dispatch now maps HID to Evdev, synchronizes modifier masks, emits Unicode keysyms and releases held keys on explicit close. Twenty helper tests pass. Real portal input, host layout behavior and Shell identity handoff remain unverified. Native helper shutdown now requests SIGTERM and gives a bounded cleanup grace before SIGKILL fallback. A real-child fixture writes its finally-cleanup marker before close returns; helper tests and native input test pass. Actual portal cleanup remains unverified. Packaging now includes the Python helper and native portal modules; the backend discovers the standard installed helper or an explicit override. A source archive was built and its portal files verified against the worktree; RPM expansion includes install and file-manifest entries. RPM installation and real portal runtime remain unverified."
+    },
+    {
+      "id": "desk-duty-pop-stow",
+      "title": "Stow the Desk When the Duty Pops",
+      "status": "host-tested",
+      "evidence": [
+        "tests/XivDesktop.Core.Tests/DesktopContextTests.cs"
+      ],
+      "in_game_verified": false,
+      "released": false
+    },
+    {
+      "id": "desk-privacy-veil",
+      "title": "The Veil",
+      "status": "host-tested",
+      "evidence": [
+        "tests/XivDesktop.Core.Tests/PrivacyVeilTests.cs"
+      ],
+      "in_game_verified": false,
+      "released": false
+    }
+  ]
+}

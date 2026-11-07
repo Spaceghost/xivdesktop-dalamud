@@ -4,7 +4,7 @@ namespace XivDesktop.Core;
 
 /// <summary>
 /// Parser for the [Desktop Entry] group of freedesktop .desktop files (Desktop Entry Specification 1.5).
-/// Other groups (Desktop Action ...) are ignored. Never throws on malformed input; returns null when the
+/// Only actions listed in Actions= are exposed. Never throws on malformed input; returns null when the
 /// file has no [Desktop Entry] group.
 /// </summary>
 public static class DesktopEntryParser
@@ -15,6 +15,8 @@ public static class DesktopEntryParser
     {
         var plain = new Dictionary<string, string>(StringComparer.Ordinal);
         var localized = new Dictionary<string, List<(string Locale, string Value)>>(StringComparer.Ordinal);
+        var groups = new Dictionary<string, StringBuilder>(StringComparer.Ordinal);
+        StringBuilder? actionText = null;
         var inMain = false;
         var sawMain = false;
 
@@ -28,15 +30,27 @@ public static class DesktopEntryParser
             {
                 var close = line.IndexOf(']');
                 var group = close > 0 ? line[1..close] : "";
-                if (sawMain && inMain)
-                    break; // the main group ended; nothing after it matters
+                actionText = null;
+                const string actionPrefix = "Desktop Action ";
+                if (group.StartsWith(actionPrefix, StringComparison.Ordinal))
+                {
+                    var actionId = group[actionPrefix.Length..];
+                    if (!groups.ContainsKey(actionId))
+                    {
+                        actionText = new StringBuilder("[Desktop Entry]\n");
+                        groups.Add(actionId, actionText);
+                    }
+                }
                 inMain = group == MainGroup;
                 sawMain |= inMain;
                 continue;
             }
 
             if (!inMain)
+            {
+                actionText?.AppendLine(line);
                 continue;
+            }
 
             var eq = line.IndexOf('=');
             if (eq <= 0)
@@ -83,6 +97,20 @@ public static class DesktopEntryParser
 
         bool Bool(string key) => plain.TryGetValue(key, out var v) && v.Trim() == "true";
 
+        var actions = new List<DesktopAction>();
+        foreach (var actionId in List("Actions").Distinct(StringComparer.Ordinal))
+        {
+            if (!groups.TryGetValue(actionId, out var group))
+                continue;
+            var action = Parse(group.ToString(), actionId)!;
+            var command = ExecLine.ToShellCommand(action.Exec);
+            if (string.IsNullOrWhiteSpace(action.Name) || string.IsNullOrWhiteSpace(command)
+                || action.Exec.Contains('\n') || action.Exec.Contains('\r')
+                || command.Contains('\n') || command.Contains('\r'))
+                continue;
+            actions.Add(new DesktopAction(actionId, action.Name, action.Exec, command, action.Icon));
+        }
+
         return new DesktopEntry
         {
             Id = id,
@@ -93,7 +121,9 @@ public static class DesktopEntryParser
             Comment = LocaleStr("Comment"),
             Keywords = List("Keywords", localizedKey: true),
             Categories = List("Categories"),
+            MimeTypes = List("MimeType"),
             Exec = Str("Exec"),
+            Actions = actions,
             TryExec = Str("TryExec"),
             Icon = LocaleStr("Icon"),
             Terminal = Bool("Terminal"),

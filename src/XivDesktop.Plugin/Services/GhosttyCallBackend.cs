@@ -1,6 +1,7 @@
 using Dalamud.Plugin;
 using Dalamud.Plugin.Ipc;
 using Dalamud.Plugin.Services;
+using XivDesktop.Core;
 using XivDesktop.Core.Windows;
 using XivDesktop.Shared;
 
@@ -151,6 +152,35 @@ public sealed class GhosttyCallBackend : ILaunchBackend, IWindowManager, IDispos
 
     public string TerminalNew(string? profile, string? pin, Action<long>? onPanel = null) => Change(GhosttyWire.TerminalNew(profile, pin), onPanel);
 
+    public long? QueueClipboard(bool write, string text = "")
+    {
+        if (!WindowsAvailable) return null;
+        try
+        {
+            var reply = GhosttyWire.ParseReply(call.InvokeFunc(write ? GhosttyWire.ClipboardWrite(text) : GhosttyWire.ClipboardRead()));
+            return reply.Ok ? GhosttyWire.ParseQueued(reply) : null;
+        }
+        catch (Exception) { return null; }
+    }
+
+    public string RequestClipboardRead() => Change(GhosttyWire.ClipboardRead());
+
+    public string RequestClipboardWrite(string text) => Change(GhosttyWire.ClipboardWrite(text));
+
+    public XivDesktop.Core.Clipboard.ClipboardResult? ReadClipboardResult()
+    {
+        if (!WindowsAvailable) return null;
+        try { return GhosttyWire.ParseClipboard(call.InvokeFunc(GhosttyWire.ClipboardResult())); }
+        catch (Exception) { return null; }
+    }
+
+    public XivDesktop.Core.Notifications.AppNotificationSnapshot? ReadNotifications()
+    {
+        if (!WindowsAvailable) return null;
+        try { return GhosttyWire.ParseNotifications(call.InvokeFunc(GhosttyWire.NotificationsRead())); }
+        catch (Exception) { return null; }
+    }
+
     public string FocusCycle(int dir) => Change(GhosttyWire.FocusCycle(dir));
 
     public string RefreshAgentLists()
@@ -208,6 +238,8 @@ public sealed class GhosttyCallBackend : ILaunchBackend, IWindowManager, IDispos
         {
             if (!WindowsAvailable)
             {
+                lastIconPixels = 0;
+                requestedSvgCatalog = null;
                 if (snapshot.Rev != -1)
                     Publish(WindowListSnapshot.Empty);
                 agent = null;
@@ -252,10 +284,44 @@ public sealed class GhosttyCallBackend : ILaunchBackend, IWindowManager, IDispos
     /// agent.apps fills from the agent's window list (WLISTR). Re-read it whenever a new list arrived; while it
     /// is empty and the agent is connected, ask for a list at most every 30 s.
     /// </summary>
+    public Func<int> IconPixels { get; set; } = () => 128;
+    private int lastIconPixels;
+
+    public Func<AppCatalog> SvgIconCatalog { get; set; } = () => AppCatalog.Empty;
+    public Action<int, IReadOnlyList<SvgIconReply>>? RenderedIcons { get; set; }
+    private AppCatalog? requestedSvgCatalog;
+    private int requestedSvgSize;
+    private long lastSvgRequestMs;
+
+    private void PollSvgIcons(long now, int pixels)
+    {
+        var source = SvgIconCatalog();
+        var requests = SvgIconRequests.Build(source.Apps, pixels);
+        if (requests.Count == 0) return;
+        if (!ReferenceEquals(source, requestedSvgCatalog) || requestedSvgSize != pixels || now - lastSvgRequestMs >= 30000)
+        {
+            requestedSvgCatalog = source;
+            requestedSvgSize = pixels;
+            lastSvgRequestMs = now;
+            foreach (var request in requests) Change(GhosttyWire.AgentIconsRender(request));
+        }
+        var replies = GhosttyWire.ParseAgentIcons(call.InvokeFunc(GhosttyWire.AgentIcons()));
+        RenderedIcons?.Invoke(pixels, replies);
+    }
+
     private void PollAgentApps(long now)
     {
+        if (agent is not { Connected: true }) { lastIconPixels = 0; requestedSvgCatalog = null; }
         if (!Extended || agent is not { Connected: true } a)
             return;
+        if (a.WindowLists < appsForLists) lastIconPixels = 0;
+        var pixels = Math.Clamp(IconPixels(), 16, 512);
+        if (pixels != lastIconPixels)
+        {
+            lastIconPixels = pixels; // one request per setting/connection, including older hosts that refuse it
+            Change(GhosttyWire.AgentWindowsRefresh(pixels));
+        }
+        PollSvgIcons(now, pixels);
         if (a.WindowLists != appsForLists)
         {
             appsForLists = a.WindowLists;

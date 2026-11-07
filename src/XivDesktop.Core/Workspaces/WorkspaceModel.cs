@@ -16,6 +16,7 @@ public sealed class WorkspaceEntry
     public string Title { get; set; } = "";
 
     public string App { get; set; } = "";
+    public string? DesktopAppId { get; set; }
 }
 
 /// <summary>One visibility change to send: hide or show panel <paramref name="Id"/>.</summary>
@@ -44,10 +45,41 @@ public sealed class WorkspaceModel
 
     public int Current { get; private set; }
 
+    public long? ShownScratchpad { get; private set; }
+
+    public bool IsScratchpad(long id) => entries.Any(e => e.PanelId == id && e.Workspace == 0);
+
+    public void DismissScratchpad() => ShownScratchpad = null;
+
+    public bool ShowScratchpad(long id)
+    {
+        if (!IsScratchpad(id)) return false;
+        ShownScratchpad = id;
+        return true;
+    }
+
+    public long? SummonScratchpad(IReadOnlyList<WindowPanel> windows)
+    {
+        var ids = windows.Where(w => !w.IsEnded && IsScratchpad(w.Id)).Select(w => w.Id).ToList();
+        if (ids.Count == 0 || (ids.Count == 1 && ShownScratchpad == ids[0]))
+            return ShownScratchpad = null;
+        var index = ShownScratchpad is { } shown ? ids.IndexOf(shown) : -1;
+        return ShownScratchpad = ids[(index + 1) % ids.Count];
+    }
+
     /// <summary>Copies of the entries, for persisting.</summary>
-    public List<WorkspaceEntry> Export() => entries.Select(e => new WorkspaceEntry { Workspace = e.Workspace, PanelId = e.PanelId, Title = e.Title, App = e.App }).ToList();
+    public List<WorkspaceEntry> Export() => entries.Select(e => new WorkspaceEntry { Workspace = e.Workspace, PanelId = e.PanelId, Title = e.Title, App = e.App, DesktopAppId = e.DesktopAppId }).ToList();
 
     public IReadOnlyCollection<long> Hidden => hidden;
+
+    public string? AppIdOf(long panelId) => entries.FirstOrDefault(e => e.PanelId == panelId)?.DesktopAppId;
+    public bool AssignApp(long panelId, string appId)
+    {
+        var entry = entries.FirstOrDefault(e => e.PanelId == panelId);
+        if (entry == null || entry.DesktopAppId == appId) return false;
+        entry.DesktopAppId = appId;
+        return true;
+    }
 
     /// <summary>The workspace of a panel, or 0 when it is not known yet.</summary>
     public int WorkspaceOf(long panelId)
@@ -75,6 +107,8 @@ public sealed class WorkspaceModel
         var changed = false;
         var present = new HashSet<long>(windows.Select(w => w.Id));
         hidden.IntersectWith(present);
+        if (ShownScratchpad is { } shown && !windows.Any(w => w.Id == shown && !w.IsEnded))
+            ShownScratchpad = null;
 
         foreach (var w in windows)
         {
@@ -171,7 +205,7 @@ public sealed class WorkspaceModel
     /// <summary>Moves a panel to workspace <paramref name="n"/>. Returns false when out of range or already there.</summary>
     public bool Move(long panelId, int n, WindowPanel? window = null)
     {
-        if (n is < 1 or > Count)
+        if (n is < 0 or > Count)
             return false;
         var entry = entries.FirstOrDefault(e => e.PanelId == panelId);
         if (entry == null)
@@ -191,15 +225,18 @@ public sealed class WorkspaceModel
     /// full-screen and tab views are left alone. A panel's reported <see cref="WindowPanel.Hidden"/> wins over
     /// what <see cref="MarkHidden"/> recorded.
     /// </summary>
-    public List<VisibilityChange> Plan(IReadOnlyList<WindowPanel> windows)
+    public List<VisibilityChange> Plan(IReadOnlyList<WindowPanel> windows, bool hideWorkspaces = true)
     {
         var plan = new List<VisibilityChange>();
         foreach (var w in windows)
         {
-            if (w.IsEnded || w.Kind is not ("pet" or "pin"))
+            if (w.IsEnded || w.Kind is not ("pet" or "pin" or "hud"))
                 continue;
             var ws = WorkspaceOf(w.Id);
-            var wantHidden = ws != 0 && ws != Current;
+            var scratchpad = IsScratchpad(w.Id);
+            if (!scratchpad && !hideWorkspaces)
+                continue;
+            var wantHidden = scratchpad ? ShownScratchpad != w.Id : ws != 0 && ws != Current;
 
             // A ghostty-dalamud that reports "hidden" is the truth; an older one only has what we sent.
             var isHidden = w.Hidden ?? hidden.Contains(w.Id);
@@ -224,7 +261,7 @@ public sealed class WorkspaceModel
 
     private static WorkspaceEntry Clamp(WorkspaceEntry e)
     {
-        e.Workspace = Math.Clamp(e.Workspace, 1, Count);
+        e.Workspace = e.Workspace == 0 ? 0 : Math.Clamp(e.Workspace, 1, Count);
         e.Title ??= "";
         e.App ??= "";
         return e;

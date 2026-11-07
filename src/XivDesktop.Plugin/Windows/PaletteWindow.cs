@@ -38,6 +38,8 @@ public sealed class PaletteWindow : Window
     private AppCatalog? lastCatalog;
     private long lastRev = long.MinValue;
     private int lastWorkspace;
+    private bool lastVeiled;
+    private string lastPlates = "";
     private int lastFavourites = -1;
     private List<PaletteItem> results = [];
     private int selected;
@@ -202,12 +204,15 @@ public sealed class PaletteWindow : Window
         var rev = session.Windows.Snapshot.Rev;
         var ws = session.CurrentWorkspace;
         var favs = desktop.Favourites.Count;
-        if (query == lastQuery && ReferenceEquals(catalog, lastCatalog) && rev == lastRev && ws == lastWorkspace && favs == lastFavourites)
+        if (query == lastQuery && ReferenceEquals(catalog, lastCatalog) && rev == lastRev && ws == lastWorkspace && favs == lastFavourites && lastVeiled == session.Veiled && lastPlates == XivDesktop.Shared.IpcContract.Serialize(session.Plates))
             return;
         var changed = query != lastQuery;
         lastQuery = query;
         lastCatalog = catalog;
         lastRev = rev;
+        if (lastVeiled != session.Veiled) flash = null;
+        lastVeiled = session.Veiled;
+        lastPlates = XivDesktop.Shared.IpcContract.Serialize(session.Plates);
         lastWorkspace = ws;
         lastFavourites = favs;
         results = PaletteEngine.Build(runner.Context(), query, MaxRows);
@@ -312,7 +317,7 @@ public sealed class PaletteWindow : Window
     /// <summary>A row action other than the primary keeps the palette open, so several can follow by keyboard.</summary>
     private void RunAction(PaletteItem item, RowAction action)
     {
-        if (action.Chord.IsNone)
+        if (action.Command == item.Command)
         {
             Run(item);
             return;
@@ -434,7 +439,7 @@ public sealed class PaletteWindow : Window
                 return;
             case PaletteProvider.Panel:
                 var pw = item.WindowId is { } pid ? session.Windows.Snapshot.Find(pid) : null;
-                if (item.PanelKind == "window" && pw != null && session.AppFor(pw) is { } papp)
+                if (item.PanelKind == "window" && pw != null && !session.Veiled && session.AppFor(pw) is { } papp)
                 {
                     IconDrawer.App(textures, draw, papp, pos, size, dimmed: item.PanelView == "hidden");
                     return;
@@ -450,7 +455,7 @@ public sealed class PaletteWindow : Window
                 IconDrawer.Glyph(ui, draw, kindGlyph, ImGui.GetColorU32(BadgeColor(PaletteProvider.Window) with { W = 0.30f }), glyphCol, pos, size);
                 return;
             case PaletteProvider.Window when item.WindowId is { } id && session.Windows.Snapshot.Find(id) is { } w:
-                if (session.AppFor(w) is { } wapp)
+                if (!session.Veiled && session.AppFor(w) is { } wapp)
                 {
                     IconDrawer.App(textures, draw, wapp, pos, size, dimmed: false);
                     // A small corner mark says "open window", not "app".
