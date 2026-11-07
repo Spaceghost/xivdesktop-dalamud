@@ -104,8 +104,11 @@ public class DesktopActionTests
         var app = DesktopEntryParser.Parse(Entry, "browser.desktop")!;
         var item = new PaletteItem
         {
-            Provider = PaletteProvider.App, Title = app.Name, AppId = app.Id,
-            AppActions = app.Actions, Command = new PaletteCommand(PaletteCommand.Launch, app.Id),
+            Provider = PaletteProvider.App,
+            Title = app.Name,
+            AppId = app.Id,
+            AppActions = app.Actions,
+            Command = new PaletteCommand(PaletteCommand.Launch, app.Id),
         };
         var actions = PaletteEngine.RowActions(item);
         Assert.Equal(5, actions.Count);

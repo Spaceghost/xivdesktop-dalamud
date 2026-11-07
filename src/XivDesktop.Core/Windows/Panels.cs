@@ -151,10 +151,15 @@ public static class Panels
             if (result.ContainsKey(p.Id) || p.View is not ("pet" or "pin" or "hud" or "hidden" or "full")) continue;
             result[p.Id] = new WindowPanel
             {
-                Id = p.Id, Title = p.Title, App = p.App.Length > 0 ? p.App : p.Kind == "terminal" ? "profile:" + p.Profile : "",
-                State = p.Running == false ? "ended" : "live", Focused = p.Focused,
+                Id = p.Id,
+                Title = p.Title,
+                App = p.App.Length > 0 ? p.App : p.Kind == "terminal" ? "profile:" + p.Profile : "",
+                State = p.Running == false ? "ended" : "live",
+                Focused = p.Focused,
                 Kind = p.View == "hidden" ? "pin" : p.View,
-                Hidden = p.IsHidden, Pin = p.Pin, SupportsPlacementCapture = p.SupportsPlacementCapture,
+                Hidden = p.IsHidden,
+                Pin = p.Pin,
+                SupportsPlacementCapture = p.SupportsPlacementCapture,
             };
         }
         return result.Values.OrderBy(w => w.Id).ToList();

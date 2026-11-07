@@ -110,7 +110,7 @@ public sealed class AskBackend : IDisposable
         catch (OperationCanceledException) when (token.IsCancellationRequested)
         {
             // Dismissed, replaced by a newer question, or timed out: nothing to report unless it timed out.
-            if (ReferenceEquals(Volatile.Read(ref current)?.Token, token))
+            if (Volatile.Read(ref current)?.Token == token)
                 events.Enqueue(StreamEvent.Error("the answer took too long"));
         }
         catch (HttpRequestException ex)

@@ -14,7 +14,10 @@ public static class PrivacyVeil
     public static bool Active(bool manual, bool inGpose, bool autoGpose) => manual || inGpose && autoGpose;
     public static WindowPanel Mask(WindowPanel window, bool active) => !active ? window : window with
     {
-        Title = "Window " + window.Id, App = "", Key = "", Agent = "",
+        Title = "Window " + window.Id,
+        App = "",
+        Key = "",
+        Agent = "",
     };
     public static PanelListSnapshot? Mask(PanelListSnapshot? panels, bool active) => !active || panels == null ? panels : panels with
     {

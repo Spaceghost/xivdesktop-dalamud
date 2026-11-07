@@ -15,7 +15,15 @@ Statuses mean the same thing in every one of these mods:
 
 ## [Unreleased] — In development
 
-Accepted vote features; host validation does not certify in-game behavior.
+Host-tested feature work; live game acceptance remains pending.
+
+### Merged, not yet verified in game
+
+* Malformed Unicode escapes in Ghostty IPC replies are rejected before downstream readers inspect them. Invalid numeric request/revision fields and malformed Arcade strings also return an empty result instead of throwing. Includes deterministic regressions for the input found by CI fuzzing.
+* Experimental desktop feature build: app actions and macro copying, key-chord recording, workspace stowing and privacy masking, desk-plate and zone policies, notification handling, SVG icon requests and the optional controller ring. Offline logic tests and builds are available; compositor transport, clipboard integration and live game/controller acceptance retain the limits documented in accepted-votes.json. This build does not certify every planned feature.
+* Ask an NPC now reports a timeout for the request that is still active. Cancellation tokens were compared by object identity, which always failed after boxing the value types and suppressed the error. Value equality preserves suppression for dismissed or replaced questions.
+
+### Being built
 
 * Right-click apps to use the actions listed in their .desktop files, such as New Window. The palette offers the same actions. Commands use the existing launch backend and terminal handling; agent-listed apps retain actions when their .desktop file is visible to the directory scan.
 * Copy game macro from the app grid, or Copy macro (Ctrl+Shift+C) in the palette, copies /desktop launch <desktop-file id> for a hotbar macro. The desktop id stays stable across rescans.

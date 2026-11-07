@@ -65,5 +65,5 @@ public class ControllerRingTests
     [InlineData(-1, 0, 6)]
     [InlineData(0.1f, 0.1f, -1)]
     public void StickMapsToClockwiseSectors(float x, float y, int expected)
-        => Assert.Equal(expected, ControllerRing.Sector(new(x,y), 8));
+        => Assert.Equal(expected, ControllerRing.Sector(new(x, y), 8));
 }

@@ -2,7 +2,7 @@
   <PropertyGroup>
     <AssemblyName>XivDesktop</AssemblyName>
     <RootNamespace>XivDesktop.Plugin</RootNamespace>
-    <Version>1.0.2.4</Version>
+    <Version>1.0.3.2</Version>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\XivDesktop.Core\XivDesktop.Core.csproj" />
@@ -11,6 +11,6 @@
   </ItemGroup>
   <ItemGroup>
     <!-- Native (AtkUnitBase) dialogue and picker for Ask an NPC. MIT, github.com/MidoriKami/KamiToolKit; built for Dalamud API 15. -->
-    <PackageReference Include="KamiToolKit" Version="2.2.49" />
+    <PackageReference Include="KamiToolKit" Version="2.2.64" />
   </ItemGroup>
 </Project>
